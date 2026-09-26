@@ -1,0 +1,17 @@
+{
+  "name": "EV3 · Carga inteligente",
+  "short_name": "EV3",
+  "description": "Precio de la luz (REE), recargas, supercargas y gastos del Kia EV3",
+  "lang": "es-ES",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F0EF",
+  "theme_color": "#F2F0EF",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

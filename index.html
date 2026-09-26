@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>EV3 · Carga</title>
+  <meta name="description" content="Precio de la luz (REE), recargas, supercargas y gastos del Kia EV3">
+  <meta name="theme-color" content="#F2F0EF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="EV3">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" as="image" href="/ev3-reposo.jpg">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app">
+
+    <!-- Cabecera -->
+    <header class="top">
+      <div>
+        <h1>EV3</h1>
+        <p class="sub">Kia EV3 · 84,1 kWh · 3,7 kW</p>
+        <p class="status" id="status"><span class="dot"></span><span id="statusText">En reposo</span></p>
+      </div>
+      <button class="icon-btn" id="liveBtn" aria-label="Iniciar carga">
+        <svg viewBox="0 0 24 24"><path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/></svg>
+      </button>
+    </header>
+
+    <!-- Hero: menú + coche -->
+    <section class="hero">
+      <nav class="rail" aria-label="Menú">
+        <button class="rail-btn active" data-view="inicio" aria-label="Inicio">
+          <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>
+        </button>
+        <span class="rail-sep"></span>
+        <button class="rail-btn" data-view="simulador" aria-label="Recargas">
+          <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15h.01M12 15h.01M15.5 15v2.5M8.5 18h.01M12 18h.01"/></svg>
+        </button>
+        <span class="rail-sep"></span>
+        <button class="rail-btn" data-view="acumulado" aria-label="Acumulado">
+          <svg viewBox="0 0 24 24"><path d="M4 20h16M7 16.5V11M12 16.5V6M17 16.5v-3.5"/></svg>
+        </button>
+        <span class="rail-sep"></span>
+        <button class="rail-btn" data-view="gastos" aria-label="Otros gastos">
+          <svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L4 16.7 7.3 20l5.3-5.3a4 4 0 0 0 5.1-5.4l-2.5 2.5-2.5-.6-.6-2.5z"/></svg>
+        </button>
+      </nav>
+      <div class="car" id="car">
+        <img class="car-img reposo" src="/ev3-reposo.jpg" alt="Kia EV3 en reposo">
+        <img class="car-img cargando" src="/ev3-cargando.jpg" alt="Kia EV3 cargando" loading="lazy">
+      </div>
+    </section>
+
+    <!-- ============ INICIO ============ -->
+    <section class="view active" id="view-inicio">
+      <div class="seg" role="tablist" data-seg="day">
+        <button class="on" data-v="0">Hoy</button>
+        <button data-v="1">Mañana</button>
+        <span class="seg-thumb"></span>
+      </div>
+
+      <article class="card price-card">
+        <div class="price-head">
+          <span class="label" id="priceLabel">Precio ahora</span>
+          <span class="badge" id="priceBadge">—</span>
+        </div>
+        <div class="price-big"><span id="priceValue">—</span><small>€/kWh</small></div>
+        <p class="muted" id="priceHour">Cargando precios…</p>
+      </article>
+
+      <article class="card chart-card" id="chartCard">
+        <div class="card-head">
+          <span class="label">Precio por hora</span>
+          <span class="legend">
+            <i class="lv lv-b"></i>Barato <i class="lv lv-m"></i>Medio <i class="lv lv-c"></i>Caro
+          </span>
+        </div>
+        <div class="chart" id="chart" role="button" tabindex="0" aria-label="Ver el detalle de precios por hora"></div>
+        <div class="chart-axis"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
+        <div class="stats" id="dayStats"></div>
+        <p class="hint">Toca el gráfico para ver el detalle por horas</p>
+      </article>
+
+      <article class="card tip" id="bestCard" hidden>
+        <span class="label">Mejor ventana para cargar</span>
+        <p class="tip-main" id="bestText"></p>
+        <p class="muted" id="bestSub"></p>
+      </article>
+      <p class="source">Datos: Red Eléctrica · PVPC 2.0TD (península)</p>
+    </section>
+
+    <!-- ============ RECARGAS ============ -->
+    <section class="view" id="view-simulador">
+      <h2 class="section-title">Recarga en casa</h2>
+      <article class="card form">
+        <label class="row"><span>Fecha</span><input type="date" id="simDate"></label>
+        <label class="row"><span>Inicio</span><input type="time" id="simStart" step="900" value="00:00"></label>
+        <label class="row"><span>Fin</span><input type="time" id="simEnd" step="900" value="07:00"></label>
+        <div class="row">
+          <span>Bono social <small class="row-note">−50 % por kWh</small></span>
+          <label class="switch"><input type="checkbox" id="simBono"><i></i></label>
+        </div>
+        <div class="chips" id="simChips">
+          <button data-h="2">2 h</button><button data-h="4">4 h</button><button data-h="6">6 h</button><button data-h="8">8 h</button><button data-full>Hasta 100 %</button>
+        </div>
+      </article>
+
+      <article class="card result">
+        <div class="kpis">
+          <div><span class="label">Energía</span><b id="simKwh">—</b><small>kWh</small></div>
+          <div><span class="label">Coste</span><b id="simCost">—</b><small id="simCostNote">€</small></div>
+        </div>
+        <div class="kpis small">
+          <div><span class="label">Duración</span><b id="simDur">—</b></div>
+          <div><span class="label">Precio medio</span><b id="simAvg">—</b></div>
+          <div><span class="label">Batería</span><b id="simPct">—</b></div>
+        </div>
+        <div class="breakdown" id="simBreak"></div>
+        <p class="warn" id="simWarn" hidden></p>
+        <button class="primary" id="simSave">Registrar carga</button>
+      </article>
+
+      <h2 class="section-title">Supercarga <small>fuera de casa</small></h2>
+      <article class="card form">
+        <label class="row"><span>Fecha</span><input type="date" id="supDate"></label>
+        <label class="row"><span>Hora</span><input type="time" id="supTime" step="60"></label>
+        <label class="row"><span>Lugar</span><input type="text" id="supPlace" placeholder="Opcional" autocomplete="off"></label>
+        <label class="row"><span>Energía (kWh)</span><input type="text" id="supKwh" inputmode="decimal" placeholder="0,00"></label>
+        <label class="row"><span>Coste (€)</span><input type="text" id="supCost" inputmode="decimal" placeholder="0,00"></label>
+      </article>
+      <article class="card result compact">
+        <div class="kpis small flat3">
+          <div><span class="label">Precio por kWh</span><b id="supAvg">—</b></div>
+          <div><span class="label">Batería</span><b id="supPct">—</b></div>
+          <div><span class="label">vs. casa hoy</span><b id="supVs">—</b></div>
+        </div>
+        <button class="primary" id="supSave" disabled>Añadir supercarga</button>
+      </article>
+    </section>
+
+    <!-- ============ ACUMULADO ============ -->
+    <section class="view" id="view-acumulado">
+      <div class="seg" role="tablist" data-seg="period">
+        <button class="on" data-v="week">Semana</button>
+        <button data-v="month">Mes</button>
+        <button data-v="year">Año</button>
+        <span class="seg-thumb"></span>
+      </div>
+
+      <div class="filter-chips" id="typeChips" role="group" aria-label="Filtrar por tipo">
+        <button data-t="home">Recargas</button>
+        <button data-t="super">Supercargas</button>
+        <button data-t="gasto">Mantenimientos</button>
+      </div>
+
+      <div class="period-nav">
+        <button class="icon-btn sm" id="prevPeriod" aria-label="Anterior"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <span id="periodLabel">—</span>
+        <button class="icon-btn sm" id="nextPeriod" aria-label="Siguiente"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+      </div>
+
+      <article class="card">
+        <div class="kpis">
+          <div><span class="label">Coste total</span><b id="accCost">0</b><small>€</small></div>
+          <div><span class="label">Energía</span><b id="accKwh">0</b><small>kWh</small></div>
+        </div>
+        <div class="split" id="accSplit"></div>
+        <div class="kpis small">
+          <div><span class="label">Movimientos</span><b id="accN">0</b></div>
+          <div><span class="label">€/kWh medio</span><b id="accAvg">—</b></div>
+          <div><span class="label">≈ Km*</span><b id="accKm">—</b></div>
+        </div>
+      </article>
+
+      <article class="card list-card">
+        <div class="card-head"><span class="label" id="listTitle">Movimientos</span></div>
+        <ul class="list" id="accList"></ul>
+      </article>
+
+      <div class="data-tools">
+        <button class="secondary" id="exportBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>Exportar a Excel
+        </button>
+        <label class="secondary">
+          <svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 19h14"/></svg>Subir Excel
+          <input type="file" id="importFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+        </label>
+      </div>
+      <p class="source">El Excel exportado incluye todos los movimientos. Súbelo aquí para recuperarlos.<br>* Km estimados con 16 kWh/100 km.</p>
+    </section>
+
+    <!-- ============ OTROS GASTOS ============ -->
+    <section class="view" id="view-gastos">
+      <h2 class="section-title">Añadir gasto</h2>
+      <article class="card form">
+        <label class="row"><span>Fecha</span><input type="date" id="gDate"></label>
+        <label class="row"><span>Categoría</span>
+          <select id="gCat">
+            <option>Mantenimiento</option><option>Recambios</option><option>Neumáticos</option><option>Seguro</option>
+            <option>ITV / Impuestos</option><option>Limpieza</option><option>Accesorios</option><option>Otros</option>
+          </select>
+        </label>
+        <label class="row"><span>Concepto</span><input type="text" id="gConcept" placeholder="Ej. Revisión 30.000 km" autocomplete="off"></label>
+        <label class="row"><span>Importe (€)</span><input type="text" id="gAmount" inputmode="decimal" placeholder="0,00"></label>
+        <button class="primary" id="gSave" disabled>Añadir gasto</button>
+      </article>
+
+      <article class="card list-card">
+        <div class="card-head"><span class="label">Últimos gastos</span><span class="label" id="gTotal"></span></div>
+        <ul class="list" id="gList"></ul>
+      </article>
+      <p class="source">Los gastos se suman al Acumulado (filtro «Mantenimientos»).</p>
+    </section>
+  </main>
+
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+  <!-- Detalle de precios -->
+  <div class="sheet" id="priceSheet" role="dialog" aria-modal="true" aria-labelledby="psTitle">
+    <div class="grabber"></div>
+    <div class="sheet-head">
+      <h2 id="psTitle">Precios por hora</h2>
+      <button class="close" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <p class="muted center" id="psSub"></p>
+    <div class="ptable">
+      <div class="ptr head"><span>Hora</span><span>€/kWh</span><span id="psCostHead">1 h carga</span></div>
+      <div id="psRows"></div>
+    </div>
+    <div class="stats" id="psStats"></div>
+  </div>
+
+  <!-- Hoja de edición -->
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grabber"></div>
+    <div class="sheet-head">
+      <h2 id="sheetTitle">Editar</h2>
+      <button class="close" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="card form flat">
+      <label class="row"><span>Fecha</span><input type="date" id="edDate"></label>
+      <label class="row" data-for="home"><span>Inicio</span><input type="time" id="edStart" step="900"></label>
+      <label class="row" data-for="home"><span>Fin</span><input type="time" id="edEnd" step="900"></label>
+      <label class="row" data-for="super"><span>Hora</span><input type="time" id="edTime" step="60"></label>
+      <label class="row" data-for="super"><span>Lugar</span><input type="text" id="edPlace" autocomplete="off"></label>
+      <label class="row" data-for="gasto"><span>Categoría</span>
+        <select id="edCat">
+          <option>Mantenimiento</option><option>Recambios</option><option>Neumáticos</option><option>Seguro</option>
+          <option>ITV / Impuestos</option><option>Limpieza</option><option>Accesorios</option><option>Otros</option>
+        </select>
+      </label>
+      <label class="row" data-for="gasto"><span>Concepto</span><input type="text" id="edConcept" autocomplete="off"></label>
+      <div class="row" data-for="home"><span>Bono social <small class="row-note">−50 %</small></span><label class="switch"><input type="checkbox" id="edBono"><i></i></label></div>
+      <label class="row" data-for="home super"><span>Energía (kWh)</span><input type="text" id="edKwh" inputmode="decimal"></label>
+      <label class="row"><span id="edCostLabel">Coste (€)</span><input type="text" id="edCost" inputmode="decimal"></label>
+    </div>
+    <button class="link" id="edRecalc" data-for="home">Recalcular con precios REE</button>
+    <button class="primary" id="edSave">Guardar cambios</button>
+    <button class="danger" id="edDelete">Eliminar</button>
+  </div>
+
+  <!-- Confirmación -->
+  <div class="alert-backdrop" id="alert" hidden>
+    <div class="alert">
+      <h3 id="alertTitle">¿Eliminar?</h3>
+      <p id="alertMsg">Esta acción no se puede deshacer.</p>
+      <div class="alert-actions">
+        <button id="alertCancel">Cancelar</button>
+        <button id="alertOk" class="destructive">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="tooltip" id="tooltip"></div>
+
+  <script src="/xlsx-lite.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>
