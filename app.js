@@ -188,10 +188,85 @@
     if (v === 'inicio') renderInicio();
     if (v === 'simulador') renderSim();
     if (v === 'acumulado') renderAcc();
-    if (v === 'gastos') renderGastos();
+    if (v === 'gastos') { renderGastos(); playIntro(); } else stopIntro();
     try { history.replaceState(null, '', v === 'inicio' ? location.pathname : '#' + v); } catch {}
   }
   $$('.rail-btn').forEach(b => b.addEventListener('click', () => { go(b.dataset.view); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
+
+  // ---------- Coche: morphing entre apartados + animación de entrada (Otros gastos) ----------
+  const hero = $('.hero'), carBox = $('#car'), introVid = $('#gastoVideo');
+  const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Posición del coche dentro de cada imagen (fracciones): centro, largo y proporción del archivo
+  const GEO = {
+    still: { ar: 478 / 1024, cx: 0.523, cy: 0.464, len: 0.793 },
+    video: { ar: 640 / 554, cx: 0.556, cy: 0.470, len: 0.818 }
+  };
+  function carRect(g, W, H) {
+    let w, h; if (W / H > g.ar) { h = H; w = H * g.ar; } else { w = W; h = W / g.ar; }
+    return { x: (W - w) / 2 + g.cx * w, y: (H - h) / 2 + g.cy * h, len: g.len * h };
+  }
+  // transform que coloca el coche de "from" exactamente encima del coche de "to"
+  function morph(from, to, W, H) {
+    const a = carRect(from, W, H), b = carRect(to, W, H), s = b.len / a.len;
+    const tx = b.x - W / 2 - s * (a.x - W / 2), ty = b.y - H / 2 - s * (a.y - H / 2);
+    return `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
+  }
+  function layoutMorph() {
+    const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
+    carBox.style.setProperty('--tv', morph(GEO.video, GEO.still, W, H));
+    carBox.style.setProperty('--ts', morph(GEO.still, GEO.video, W, H));
+  }
+  window.addEventListener('resize', layoutMorph);
+
+  let introTimer = null;
+  function introFinal() { if (view !== 'gastos') return; hero.classList.remove('intro-play'); hero.classList.add('gasto', 'intro-final'); }
+  function playIntro() {
+    clearTimeout(introTimer);
+    layoutMorph();
+    hero.classList.remove('intro-final', 'intro-play');
+    if (reducedMotion) { introFinal(); return; }
+    try { introVid.pause(); introVid.currentTime = 0; } catch {}
+    // El morph empieza cuando el vídeo ya está en marcha (su primer segundo es el coche solo)
+    const onPlaying = () => { clearTimeout(introTimer); if (view === 'gastos') hero.classList.add('gasto', 'intro-play'); };
+    introVid.addEventListener('playing', onPlaying, { once: true });
+    const p = introVid.play();
+    if (p && p.catch) p.catch(() => { introVid.removeEventListener('playing', onPlaying); introFinal(); });
+    introTimer = setTimeout(() => { if (!hero.classList.contains('intro-play')) { introVid.removeEventListener('playing', onPlaying); introFinal(); } }, 2000);
+  }
+  function stopIntro() {
+    clearTimeout(introTimer);
+    hero.classList.remove('gasto', 'intro-play', 'intro-final');
+    setTimeout(() => { if (view !== 'gastos') try { introVid.pause(); } catch {} }, 850);
+  }
+  // Al terminar, el vídeo se queda en su último fotograma (sin bucle)
+
+  // ---------- Arranque: el coche "se abre" (doble parpadeo de intermitentes) ----------
+  let booting = true;
+  function finishBoot() {
+    if (!booting) return;
+    booting = false;
+    hero.classList.remove('boot', 'blink');
+    renderStatus();
+  }
+  function bootSequence() {
+    layoutMorph();
+    if (reducedMotion) { finishBoot(); return; }
+    const imgs = [$('.car-img.reposo'), $('.car-img.lit')];
+    const ready = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : Promise.resolve()));
+    const start = () => {
+      if (!booting || !hero.classList.contains('boot')) return;
+      requestAnimationFrame(() => {
+        hero.classList.remove('boot');                     // aparece el coche
+        setTimeout(() => {
+          const lit = $('.car-img.lit');
+          lit.addEventListener('animationend', finishBoot, { once: true });
+          hero.classList.add('blink');                     // parpadeo × 2
+          setTimeout(finishBoot, 2200);                    // por seguridad
+        }, 700);
+      });
+    };
+    Promise.race([ready, new Promise(r => setTimeout(r, 1500))]).then(start);
+  }
 
   // ---------- Estado de carga (coche) ----------
   let live = store.get('ev3.live', null);
@@ -216,7 +291,7 @@
       const a = activeCharge(now);
       if (a) { charging = true; msg = `Cargando · hasta ${hm(a.e)}`; }
     }
-    $('.hero').classList.toggle('charging', charging);
+    $('.hero').classList.toggle('charging', charging && !booting);
     $('#status').classList.toggle('on', charging);
     $('#statusText').textContent = msg;
     const btn = $('#liveBtn');
@@ -738,8 +813,8 @@
 
   // ---------- Arranque ----------
   renderStatus();
-  const initial = (location.hash || '').slice(1);
-  go(VIEWS.includes(initial) ? initial : 'inicio');
+  go('inicio');            // la app arranca siempre en Inicio
+  bootSequence();
   getPrices(ymd(addDays(new Date(), 1))).catch(() => {});
 
   let lastTick = ymd(new Date()) + new Date().getHours();

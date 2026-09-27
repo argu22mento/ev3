@@ -68,18 +68,31 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
 .rail-sep { width: 22px; height: 1px; background: var(--hair); }
 
 .car { position: relative; height: 100%; }
+/* Todas las capas del coche ocupan la misma caja y se ajustan con object-fit: así el "morphing" solo
+   necesita transform (translate + scale) calculado en JS a partir de la posición del coche en cada imagen */
+.car-static, .car-intro, .car-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform-origin: 50% 50%;
+}
+.car-static { transition: transform .8s var(--ease), opacity .55s var(--ease) .1s; will-change: transform, opacity; }
 .car-img {
-  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  height: 100%; width: auto; max-width: none;
-  mix-blend-mode: multiply;
+  object-fit: contain;
   transition: opacity .8s var(--ease);
   -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 78%, transparent 100%);
           mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 78%, transparent 100%);
   user-select: none; -webkit-user-drag: none;
 }
-.car-img.cargando { opacity: 0; }
+.car-img.cargando, .car-img.lit { opacity: 0; }
 .charging .car-img.cargando { opacity: 1; }
 .charging .car-img.reposo { opacity: 0; }
+
+/* Arranque: el coche aparece y "se abre" con un doble parpadeo de intermitentes */
+.hero.boot .car-static { opacity: 0; transform: scale(.94); transition: none; }
+.hero.blink .car-img.lit { animation: blink 1.5s linear both; transition: none; }
+@keyframes blink {
+  0% { opacity: 0; } 5% { opacity: 1; } 28% { opacity: 1; } 34% { opacity: 0; }
+  50% { opacity: 0; } 55% { opacity: 1; } 78% { opacity: 1; } 84% { opacity: 0; } 100% { opacity: 0; }
+}
 
 /* ---------- Vistas ---------- */
 .view { display: none; }
@@ -351,3 +364,15 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
 .lvtxt { display: block; font-size: 11px; font-weight: 500; }
 .lvtxt.b { color: #248A3D; } .lvtxt.m { color: #C93400; } .lvtxt.c { color: #D70015; } .lvtxt.na { color: var(--ink-3); }
 #priceSheet .stats { margin-top: 14px; border-top: 0; padding-top: 4px; }
+
+/* Animación de entrada · Otros gastos (morphing entre coche fijo y vídeo) */
+.car-intro {
+  object-fit: contain; opacity: 0; pointer-events: none;
+  transform: var(--tv, scale(1.6));
+  transition: transform .8s var(--ease), opacity .55s var(--ease) .1s;
+  will-change: transform, opacity;
+}
+video.car-intro::-webkit-media-controls { display: none !important; }
+.hero.gasto .car-static { opacity: 0; transform: var(--ts, scale(.6)); }
+.hero.gasto.intro-play video.car-intro, .hero.gasto.intro-final .car-intro-final { opacity: 1; transform: none; }
+.hero.gasto.intro-final video.car-intro { opacity: 0; transform: none; }

@@ -16,6 +16,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preload" as="image" href="/ev3-reposo.jpg">
+  <link rel="preload" as="image" href="/ev3-intermitentes.jpg">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -34,7 +35,7 @@
     </header>
 
     <!-- Hero: menú + coche -->
-    <section class="hero">
+    <section class="hero boot">
       <nav class="rail" aria-label="Menú">
         <button class="rail-btn active" data-view="inicio" aria-label="Inicio">
           <svg viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/></svg>
@@ -53,8 +54,16 @@
         </button>
       </nav>
       <div class="car" id="car">
-        <img class="car-img reposo" src="/ev3-reposo.jpg" alt="Kia EV3 en reposo">
-        <img class="car-img cargando" src="/ev3-cargando.jpg" alt="Kia EV3 cargando" loading="lazy">
+        <div class="car-static">
+          <img class="car-img reposo" src="/ev3-reposo.jpg" alt="Kia EV3 en reposo" decoding="async">
+          <img class="car-img cargando" src="/ev3-cargando.jpg" alt="Kia EV3 cargando" decoding="async">
+          <img class="car-img lit" src="/ev3-intermitentes.jpg" alt="" aria-hidden="true" decoding="async">
+        </div>
+        <video class="car-intro" id="gastoVideo" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true">
+          <source src="/gasto-intro.mp4" type="video/mp4">
+          <source src="/gasto-intro.webm" type="video/webm">
+        </video>
+        <img class="car-intro car-intro-final" src="/gasto-final.jpg" alt="Kia EV3 con herramientas" decoding="async">
       </div>
     </section>
 
