@@ -5,7 +5,7 @@
 
   const POWER = 3.7;          // kW
   const BATTERY = 84.1;       // kWh
-  const CONSUMPTION = 16;     // kWh/100 km (estimación para "≈ km")
+  const CONSUMPTION = 18;     // kWh/100 km · consumo medio real del coche (autonomía ganada)
   const BONO = 0.5;           // descuento bono social sobre el kWh
   const FULL_MIN = Math.round(BATTERY / POWER * 60); // ≈ 22 h 44 min
 
@@ -24,6 +24,7 @@
   const dayLabel = date => new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }).format(parseDT(date, '12:00')).replace(/\./g, '');
   const num = s => { if (typeof s === 'number') return s; const v = parseFloat(String(s || '').trim().replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return isNaN(v) ? NaN : v; };
   const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const kmOf = kwh => (kwh || 0) / CONSUMPTION * 100;
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
   // ---------- Almacenamiento ----------
@@ -157,7 +158,11 @@
     openSheetEl = el; el.classList.add('open'); $('#sheetBackdrop').classList.add('open');
     el.scrollTop = 0;
   }
+  let docReturn = null;
   function closeSheet() {
+    if (openSheetEl && openSheetEl.id === 'docSheet' && docReturn) {   // al cerrar el visor, vuelve a la edición
+      const back = docReturn; docReturn = null; openSheet(back); return;
+    }
     if (openSheetEl) openSheetEl.classList.remove('open');
     openSheetEl = null; $('#sheetBackdrop').classList.remove('open'); editId = null;
   }
@@ -165,17 +170,149 @@
   $$('[data-close]').forEach(b => b.addEventListener('click', closeSheet));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
-  function setupSeg(el, onChange) {
+  // ---------- Adjuntos (IndexedDB: los archivos no caben en localStorage) ----------
+  const files = (() => {
+    let dbp = null;
+    const open = () => dbp || (dbp = new Promise((res, rej) => {
+      const r = indexedDB.open('ev3', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('files');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    }));
+    const run = async (mode, fn) => {
+      const db = await open();
+      return new Promise((res, rej) => {
+        const t = db.transaction('files', mode), req = fn(t.objectStore('files'));
+        t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+      });
+    };
+    return {
+      put: (k, v) => run('readwrite', s => s.put(v, k)),
+      get: k => run('readonly', s => s.get(k)),
+      del: k => run('readwrite', s => s.delete(k)).catch(() => {})
+    };
+  })();
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {}
+
+  const MAX_FILE = 20 * 1024 * 1024;
+  async function prepareFile(f) {
+    if (!f) return null;
+    if (!/^image\/|application\/pdf/.test(f.type) && !/\.pdf$/i.test(f.name)) throw new Error('tipo');
+    let blob = f, type = f.type || 'application/pdf', name = f.name || 'adjunto';
+    // Fotos grandes: se reducen a 2200 px (JPEG) para no llenar el almacenamiento
+    if (/^image\//.test(type) && f.size > 1.2 * 1024 * 1024 && window.createImageBitmap) {
+      try {
+        const bmp = await createImageBitmap(f);
+        const k = Math.min(1, 2200 / Math.max(bmp.width, bmp.height));
+        const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+        const out = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+        if (out && out.size < f.size) { blob = out; type = 'image/jpeg'; name = name.replace(/\.[^.]+$/, '') + '.jpg'; }
+      } catch {}
+    }
+    if (blob.size > MAX_FILE) throw new Error('grande');
+    return { name, type, size: blob.size, data: await blob.arrayBuffer() };
+  }
+  const fileErr = e => toast(e && e.message === 'grande' ? 'El archivo supera 20 MB' : e && e.message === 'tipo' ? 'Solo PDF o imágenes' : 'No se pudo guardar el adjunto');
+  const kb = n => n > 1048576 ? `${f1.format(n / 1048576)} MB` : `${f0.format(Math.max(1, n / 1024))} KB`;
+
+  let docUrl = null, docFile = null;
+  async function openDoc(id) {
+    const rec = await files.get(id).catch(() => null);
+    if (!rec) { toast('No se encuentra el adjunto en este dispositivo'); return; }
+    if (docUrl) URL.revokeObjectURL(docUrl);
+    const blob = new Blob([rec.data], { type: rec.type });
+    docUrl = URL.createObjectURL(blob);
+    docFile = new File([blob], rec.name, { type: rec.type });
+    $('#docTitle').textContent = rec.name;
+    $('#docBody').innerHTML = /^image\//.test(rec.type)
+      ? `<img src="${docUrl}" alt="${escH(rec.name)}">`
+      : `<iframe src="${docUrl}#view=FitH" title="${escH(rec.name)}"></iframe>`;
+    docReturn = openSheetEl && openSheetEl.id !== 'docSheet' ? openSheetEl : null;
+    openSheet($('#docSheet'));
+  }
+  $('#docOpen').addEventListener('click', () => { if (docUrl) window.open(docUrl, '_blank'); });
+  $('#docShare').addEventListener('click', () => {
+    if (!docFile) return;
+    if (navigator.canShare && navigator.canShare({ files: [docFile] })) navigator.share({ files: [docFile], title: docFile.name }).catch(() => {});
+    else { const l = document.createElement('a'); l.href = docUrl; l.download = docFile.name; document.body.appendChild(l); l.click(); l.remove(); }
+  });
+
+  // ---------- Bloqueo de zoom (doble toque y pellizco) ----------
+  document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
+  document.addEventListener('touchmove', e => { if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault(); }, { passive: false });
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if (now - lastTouchEnd < 320 && !e.target.closest('input, select, textarea, button, label, a, .bar, .chart, li')) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+
+  // ---------- Deslizar horizontalmente entre pestañas ----------
+  let suppressClick = false;
+  document.addEventListener('click', e => { if (suppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+  function slideIn(pane, dir) {
+    pane.style.transition = 'none';
+    pane.style.transform = `translateX(${dir * 36}px)`; pane.style.opacity = '0';
+    void pane.offsetWidth;
+    pane.style.transition = 'transform .42s var(--ease), opacity .3s ease';
+    pane.style.transform = ''; pane.style.opacity = '';
+  }
+  function attachSwipe(pane, seg) {
+    let x0 = 0, y0 = 0, dx = 0, t0 = 0, active = false, axis = null;
+    const reset = () => { pane.style.transition = 'transform .35s var(--ease), opacity .3s'; pane.style.transform = ''; pane.style.opacity = ''; };
+    pane.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1 || e.target.closest('input, select, textarea')) { active = false; return; }
+      const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); active = true; axis = null;
+    }, { passive: true });
+    pane.addEventListener('touchmove', e => {
+      if (!active) return;
+      const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
+      if (!axis) { if (Math.abs(mx) < 10 && Math.abs(my) < 10) return; axis = Math.abs(mx) > Math.abs(my) * 1.2 ? 'x' : 'y'; }
+      if (axis !== 'x') return;
+      e.preventDefault();
+      const i = seg.get(); let d = mx;
+      if ((i === 0 && d > 0) || (i === seg.n - 1 && d < 0)) d *= 0.25;   // resistencia en los extremos
+      dx = d;
+      pane.style.transition = 'none';
+      pane.style.transform = `translateX(${d}px)`;
+      pane.style.opacity = String(1 - Math.min(0.35, Math.abs(d) / 700));
+    }, { passive: false });
+    const end = () => {
+      if (!active) return; active = false;
+      if (axis !== 'x') return;
+      suppressClick = true; setTimeout(() => { suppressClick = false; }, 380);
+      const i = seg.get(), W = pane.clientWidth, fast = Math.abs(dx) > 35 && Date.now() - t0 < 280;
+      let ni = i;
+      if ((dx < -W * 0.2 || (fast && dx < 0)) && i < seg.n - 1) ni = i + 1;
+      else if ((dx > W * 0.2 || (fast && dx > 0)) && i > 0) ni = i - 1;
+      if (ni === i) { reset(); return; }
+      const dir = ni > i ? -1 : 1;
+      pane.style.transition = 'transform .16s ease-in, opacity .16s ease-in';
+      pane.style.transform = `translateX(${dir * W * 0.45}px)`; pane.style.opacity = '0';
+      setTimeout(() => { seg.set(ni, true, true); slideIn(pane, -dir); }, 160);
+    };
+    pane.addEventListener('touchend', end); pane.addEventListener('touchcancel', end);
+  }
+
+  function setupSeg(el, onChange, pane) {
     const btns = [...el.querySelectorAll('button')];
     const thumb = el.querySelector('.seg-thumb');
     thumb.style.width = `calc((100% - 4px) / ${btns.length})`;
-    const set = (i, fire = true) => {
+    let idx = 0;
+    const set = (i, fire = true, fromSwipe = false) => {
+      const prev = idx; idx = i;
       btns.forEach((b, j) => b.classList.toggle('on', j === i));
       thumb.style.transform = `translateX(${i * 100}%)`;
       if (fire) onChange(btns[i].dataset.v);
+      if (pane && !fromSwipe && fire && prev !== i) slideIn(pane, i > prev ? 1 : -1);
     };
     btns.forEach((b, i) => b.addEventListener('click', () => set(i)));
     set(0, false);
+    const api = { get: () => idx, set, n: btns.length };
+    if (pane) attachSwipe(pane, api);
+    return api;
   }
 
   // ---------- Navegación ----------
@@ -187,7 +324,7 @@
     $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
     if (v === 'inicio') renderInicio();
     if (v === 'simulador') renderSim();
-    if (v === 'acumulado') renderAcc();
+    if (v === 'acumulado') { typeFilter.clear(); typeFilter.add('home'); renderAcc(); }
     if (v === 'gastos') { renderGastos(); playIntro(); } else stopIntro();
     try { history.replaceState(null, '', v === 'inicio' ? location.pathname : '#' + v); } catch {}
   }
@@ -398,7 +535,7 @@
     if (best) {
       const kwh = POWER * W, k = bonoPref ? BONO : 1;
       $('#bestText').textContent = `${pad(best.h)}:00 – ${pad((best.h + W) % 24)}:00`;
-      $('#bestSub').textContent = `Media ${f4.format(best.m)} €/kWh · ${f1.format(kwh)} kWh por ${f2.format(kwh * best.m * k)} € · Toca para simular`;
+      $('#bestSub').textContent = `Media ${f4.format(best.m)} €/kWh · +${f0.format(kmOf(kwh))} km de autonomía por ${f2.format(kwh * best.m * k)} € · Toca para simular`;
       const card = $('#bestCard'); card.hidden = false;
       card.onclick = () => { simState = { date, start: `${pad(best.h)}:00`, end: `${pad((best.h + W) % 24)}:00` }; go('simulador'); };
     }
@@ -436,7 +573,7 @@
   $('#chart').addEventListener('click', () => openPriceSheet(selHour));
   $('#chart').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPriceSheet(selHour); } });
 
-  setupSeg($('[data-seg="day"]'), v => { dayIdx = +v; renderInicio(); });
+  setupSeg($('[data-seg="day"]'), v => { dayIdx = +v; renderInicio(); }, $('#paneDay'));
 
   // ---------- RECARGAS: casa ----------
   let simState = null, simResult = null, simSeq = 0;
@@ -448,8 +585,7 @@
       simState = null;
     }
     if (!$('#simDate').value) $('#simDate').value = ymd(new Date());
-    if (!$('#supDate').value) { const n = new Date(); $('#supDate').value = ymd(n); $('#supTime').value = hm(n); }
-    runSim(); updateSuper();
+    runSim();
   }
 
   async function runSim() {
@@ -462,7 +598,8 @@
     if (seq !== simSeq) return;
     simResult = { date, start, end, bono, ...r };
 
-    $('#simKwh').textContent = f2.format(r.kwh);
+    $('#simKm').textContent = '+' + f0.format(kmOf(r.kwh));
+    $('#simKwhNote').textContent = `km · ${f2.format(r.kwh)} kWh`;
     $('#simCost').textContent = r.missing === r.slots.length ? '—' : f2.format(r.cost);
     $('#simCostNote').textContent = bono && !r.missing ? `€ · sin bono ${f2.format(r.costFull)} €` : '€';
     $('#simDur').textContent = durTxt(r.durMin);
@@ -494,7 +631,7 @@
     const { date, start, end, kwh, cost, costFull, bono } = simResult;
     charges.push({ id: uid(), type: 'home', date, start, end, kwh: +kwh.toFixed(3), cost: +cost.toFixed(4), costFull: +costFull.toFixed(4), bono, createdAt: new Date().toISOString() });
     saveCharges(); renderStatus();
-    toast(`Carga registrada · ${f2.format(cost)} €${bono ? ' (bono social)' : ''}`);
+    toast(`Carga registrada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €${bono ? ' (bono)' : ''}`);
   });
 
   // ---------- RECARGAS: supercarga ----------
@@ -503,7 +640,7 @@
     const ok = $('#supDate').value && kwh > 0 && cost >= 0 && !isNaN(cost);
     $('#supSave').disabled = !ok;
     $('#supAvg').textContent = ok && kwh ? `${f4.format(cost / kwh)} €` : '—';
-    $('#supPct').textContent = kwh > 0 ? `+${f0.format(Math.min(100, kwh / BATTERY * 100))} %` : '—';
+    $('#supKm').textContent = kwh > 0 ? `+${f0.format(kmOf(kwh))} km` : '—';
     const today = priceCache[ymd(new Date())];
     if (ok && kwh && today) {
       const v = today.hours.filter(x => x != null), avg = v.reduce((a, b) => a + b, 0) / v.length * (bonoPref ? BONO : 1);
@@ -517,9 +654,20 @@
     charges.push({ id: uid(), type: 'super', date: $('#supDate').value, start: $('#supTime').value || '', end: '', kwh: +kwh.toFixed(3), cost: +cost.toFixed(4), place: $('#supPlace').value.trim(), createdAt: new Date().toISOString() });
     saveCharges();
     $('#supKwh').value = ''; $('#supCost').value = ''; $('#supPlace').value = '';
-    updateSuper();
-    toast(`Supercarga añadida · ${f2.format(cost)} €`);
+    updateSuper(); toggleSuper(false);
+    toast(`Supercarga guardada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €`);
   });
+  function toggleSuper(open) {
+    $('#supForm').hidden = !open; $('#supOpen').hidden = open;
+    if (open) {
+      const n = new Date(); $('#supDate').value = ymd(n); $('#supTime').value = hm(n);
+      updateSuper();
+      $('#supForm').classList.remove('reveal'); void $('#supForm').offsetWidth; $('#supForm').classList.add('reveal');
+      setTimeout(() => $('#supForm').scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    }
+  }
+  $('#supOpen').addEventListener('click', () => toggleSuper(true));
+  $('#supCancel').addEventListener('click', () => { $('#supKwh').value = ''; $('#supCost').value = ''; $('#supPlace').value = ''; toggleSuper(false); });
 
   // ---------- OTROS GASTOS ----------
   function renderGastos() {
@@ -536,21 +684,37 @@
     $('#gSave').disabled = !($('#gDate').value && a > 0);
   }
   ['#gDate', '#gAmount'].forEach(s => $(s).addEventListener('input', updateGasto));
-  $('#gSave').addEventListener('click', () => {
+  let gPending = null;   // adjunto preparado, aún sin guardar
+  function showGFile() {
+    $('#gFileChip').hidden = !gPending; $('#gAttach .attach-add').hidden = !!gPending;
+    $('#gFileName').textContent = gPending ? `${gPending.name} · ${kb(gPending.size)}` : '';
+  }
+  $('#gFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try { gPending = await prepareFile(f); showGFile(); } catch (err) { fileErr(err); }
+  });
+  $('#gFileClear').addEventListener('click', () => { gPending = null; showGFile(); });
+  $('#gSave').addEventListener('click', async () => {
     const a = num($('#gAmount').value); if (!(a > 0)) return;
-    const cat = $('#gCat').value, concept = $('#gConcept').value.trim();
-    charges.push({ id: uid(), type: 'gasto', date: $('#gDate').value, start: '', end: '', kwh: 0, cost: +a.toFixed(2), category: cat, concept, createdAt: new Date().toISOString() });
-    saveCharges();
-    $('#gAmount').value = ''; $('#gConcept').value = '';
+    const btn = $('#gSave'); btn.disabled = true;
+    const cat = $('#gCat').value, concept = $('#gConcept').value.trim(), id = uid();
+    const rec = { id, type: 'gasto', date: $('#gDate').value, start: '', end: '', kwh: 0, cost: +a.toFixed(2), category: cat, concept, createdAt: new Date().toISOString() };
+    let attachFailed = false;
+    if (gPending) {
+      try { await files.put(id, gPending); rec.attachment = { name: gPending.name, type: gPending.type, size: gPending.size }; }
+      catch { attachFailed = true; }
+    }
+    charges.push(rec); saveCharges();
+    $('#gAmount').value = ''; $('#gConcept').value = ''; gPending = null; showGFile();
     renderGastos();
-    toast(`Gasto añadido · ${f2.format(a)} €`);
+    toast(attachFailed ? 'Gasto guardado, pero no se pudo guardar el adjunto' : `Gasto añadido · ${f2.format(a)} €${rec.attachment ? ' · con adjunto' : ''}`);
   });
   $('#gList').addEventListener('click', e => { const li = e.target.closest('li[data-id]'); if (li) openEdit(li.dataset.id); });
 
   // ---------- ACUMULADO ----------
   let period = 'week', offset = 0;
   const typeFilter = new Set();
-  const sortDesc = (a, b) => (b.date + (b.start || '')).localeCompare(a.date + (a.start || ''));
+  const sortDesc = (a, b) => (b.date + (b.start || '')).localeCompare(a.date + (a.start || '')) || (b.createdAt || '').localeCompare(a.createdAt || '');
 
   function periodRange() {
     const now = new Date(); now.setHours(0, 0, 0, 0);
@@ -576,17 +740,18 @@
     gasto: '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L4 16.7 7.3 20l5.3-5.3a4 4 0 0 0 5.1-5.4l-2.5 2.5-2.5-.6-.6-2.5z"/></svg>'
   };
 
+  const CLIP = '<svg class="clip" viewBox="0 0 24 24" aria-label="Con adjunto"><path d="M20.5 11.5 12.4 19.6a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>';
   function itemHtml(c) {
     let sub = '', right2 = '';
     if (c.type === 'home') {
       const s = parseDT(c.date, c.start); let e = parseDT(c.date, c.end); if (e <= s) e = addDays(e, 1);
       sub = `${c.start} – ${c.end} · ${durTxt((e - s) / 60000)}${c.bono ? ' · <span class="tag">Bono social</span>' : ''}`;
-      right2 = `${f1.format(c.kwh)} kWh`;
+      right2 = `+${f0.format(kmOf(c.kwh))} km`;
     } else if (c.type === 'super') {
       sub = `Supercarga${c.start ? ' · ' + c.start : ''}${c.place ? ' · ' + escH(c.place) : ''}`;
-      right2 = `${f1.format(c.kwh)} kWh`;
+      right2 = `+${f0.format(kmOf(c.kwh))} km`;
     } else {
-      sub = `${escH(c.category || 'Gasto')}${c.concept ? ' · ' + escH(c.concept) : ''}`;
+      sub = `${c.attachment ? CLIP : ''}${escH(c.category || 'Gasto')}${c.concept ? ' · ' + escH(c.concept) : ''}`;
       right2 = escH(c.category || '');
     }
     return `<li data-id="${c.id}">
@@ -609,10 +774,11 @@
     const eCost = energy.reduce((a, c) => a + c.cost, 0);
     const cost = list.reduce((a, c) => a + c.cost, 0);
     $('#accCost').textContent = f2.format(cost);
-    $('#accKwh').textContent = f1.format(kwh);
+    const km = kmOf(kwh);
+    $('#accKm').textContent = f0.format(km);
+    $('#accKwh').textContent = kwh ? `${f1.format(kwh)} kWh` : '—';
     $('#accN').textContent = list.length;
-    $('#accAvg').textContent = kwh ? `${f4.format(eCost / kwh)} €` : '—';
-    $('#accKm').textContent = kwh ? f0.format(kwh / CONSUMPTION * 100) : '—';
+    $('#accPer100').textContent = km ? `${f2.format(eCost / km * 100)} €` : '—';
 
     const parts = ['home', 'super', 'gasto'].filter(t => !typeFilter.size || typeFilter.has(t))
       .map(t => ({ t, v: list.filter(c => c.type === t).reduce((a, c) => a + c.cost, 0) }));
@@ -628,7 +794,7 @@
     ul.innerHTML = list.length ? list.map(itemHtml).join('') : `<li class="empty">No hay movimientos en este periodo</li>`;
   }
 
-  setupSeg($('[data-seg="period"]'), v => { period = v; offset = 0; renderAcc(); });
+  setupSeg($('[data-seg="period"]'), v => { period = v; offset = 0; renderAcc(); }, $('#panePeriod'));
   $('#typeChips').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     const t = b.dataset.t; typeFilter.has(t) ? typeFilter.delete(t) : typeFilter.add(t);
@@ -650,13 +816,40 @@
     $('#edStart').value = c.start || ''; $('#edEnd').value = c.end || '';
     $('#edTime').value = c.type === 'super' ? (c.start || '') : '';
     $('#edPlace').value = c.place || '';
-    $('#edCat').value = c.category || 'Otros';
+    const sel = $('#edCat');
+    [...sel.querySelectorAll('option[data-legacy]')].forEach(o => o.remove());
+    if (c.category && ![...sel.options].some(o => o.value === c.category)) { const o = new Option(c.category, c.category); o.dataset.legacy = '1'; sel.add(o); }
+    sel.value = c.category || 'Mantenimiento';
+    if (c.type === 'gasto') renderEdAttach(c);
     $('#edConcept').value = c.concept || '';
     $('#edBono').checked = !!c.bono;
-    $('#edKwh').value = f2.format(c.kwh || 0);
+    $('#edKwh').value = f2.format(c.kwh || 0); updEdKm();
     $('#edCost').value = f2.format(c.cost || 0);
     $('#edCostLabel').textContent = c.type === 'gasto' ? 'Importe (€)' : 'Coste (€)';
     openSheet(sh);
+  }
+
+  function updEdKm() { const k = num($('#edKwh').value); $('#edKmNote').textContent = k > 0 ? `+${f0.format(kmOf(k))} km de autonomía` : ''; }
+  $('#edKwh').addEventListener('input', updEdKm);
+  function renderEdAttach(c) {
+    const box = $('#edAttach');
+    if (c.attachment) {
+      box.innerHTML = `<span class="attach-chip"><button type="button" class="attach-view" id="edView">${CLIP}<span>${escH(c.attachment.name)}</span></button><button type="button" id="edDelFile" aria-label="Eliminar adjunto">✕</button></span>`;
+      $('#edView').onclick = () => openDoc(c.id);
+      $('#edDelFile').onclick = async () => {
+        if (!(await confirmBox('¿Eliminar el adjunto?', `Se borrará «${c.attachment.name}» de este gasto.`))) return;
+        await files.del(c.id); delete c.attachment; saveCharges(); renderEdAttach(c); refreshAll(); toast('Adjunto eliminado');
+      };
+    } else {
+      box.innerHTML = `<label class="attach-add"><input type="file" accept="application/pdf,image/*" hidden>${CLIP}Adjuntar</label>`;
+      box.querySelector('input').onchange = async e => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+          const p = await prepareFile(f); await files.put(c.id, p);
+          c.attachment = { name: p.name, type: p.type, size: p.size }; saveCharges(); renderEdAttach(c); refreshAll(); toast('Adjunto añadido');
+        } catch (err) { fileErr(err); }
+      };
+    }
   }
 
   async function recalcEdit() {
@@ -694,12 +887,14 @@
   $('#edDelete').addEventListener('click', async () => {
     const id = editId;
     if (!(await confirmBox('¿Eliminar este movimiento?', 'Esta acción no se puede deshacer.'))) return;
+    const gone = charges.find(x => x.id === id);
+    if (gone && gone.attachment) files.del(id);
     charges = charges.filter(x => x.id !== id);
     saveCharges(); closeSheet(); refreshAll(); toast('Eliminado');
   });
 
   // ---------- Excel: exportar / importar ----------
-  const HEAD = ['ID', 'Tipo', 'Fecha', 'Inicio', 'Fin', 'kWh', 'Coste (€)', '€/kWh', 'Bono social', 'Categoría', 'Concepto / lugar'];
+  const HEAD = ['ID', 'Tipo', 'Fecha', 'Inicio', 'Fin', 'kWh', 'Autonomía (km)', 'Coste (€)', '€/kWh', 'Bono social', 'Categoría', 'Concepto / lugar', 'Adjunto'];
 
   function exportExcel() {
     if (!window.XLSXLite) { toast('No se pudo cargar el módulo de Excel'); return; }
@@ -709,11 +904,13 @@
       c.id, TYPE_TXT[c.type], { v: c.date, s: 'date' },
       c.type === 'gasto' ? '' : (c.start || ''), c.type === 'home' ? c.end : '',
       c.type === 'gasto' ? '' : { v: +(+c.kwh).toFixed(3) },
+      c.type === 'gasto' ? '' : Math.round(kmOf(c.kwh)),
       { v: +(+c.cost).toFixed(2), s: 'money' },
       c.type !== 'gasto' && c.kwh ? +(c.cost / c.kwh).toFixed(4) : '',
       c.type === 'home' ? (c.bono ? 'Sí' : 'No') : '',
       c.type === 'gasto' ? (c.category || '') : '',
-      c.type === 'gasto' ? (c.concept || '') : (c.place || '')
+      c.type === 'gasto' ? (c.concept || '') : (c.place || ''),
+      c.attachment ? c.attachment.name : ''
     ]);
     // Resumen mensual
     const months = {};
@@ -722,18 +919,18 @@
       m[c.type] += c.cost; if (c.type === 'home') m.homeK += c.kwh; if (c.type === 'super') m.superK += c.kwh;
     }
     const mf = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' });
-    const RH = ['Mes', 'Recargas casa (€)', 'kWh casa', 'Supercargas (€)', 'kWh supercargas', 'Mantenimientos y otros (€)', 'Total (€)'].map(v => ({ v, s: 'b' }));
+    const RH = ['Mes', 'Recargas casa (€)', 'kWh casa', 'Supercargas (€)', 'kWh supercargas', 'Mantenimientos (€)', 'Total (€)', 'Autonomía ganada (km)'].map(v => ({ v, s: 'b' }));
     const tot = { home: 0, homeK: 0, super: 0, superK: 0, gasto: 0 };
     const rrows = Object.keys(months).sort().map(k => {
       const m = months[k]; Object.keys(tot).forEach(x => tot[x] += m[x]);
       const [y, mo] = k.split('-').map(Number);
-      return [mf.format(new Date(y, mo - 1, 1)), { v: +m.home.toFixed(2), s: 'money' }, +m.homeK.toFixed(2), { v: +m.super.toFixed(2), s: 'money' }, +m.superK.toFixed(2), { v: +m.gasto.toFixed(2), s: 'money' }, { v: +(m.home + m.super + m.gasto).toFixed(2), s: 'money' }];
+      return [mf.format(new Date(y, mo - 1, 1)), { v: +m.home.toFixed(2), s: 'money' }, +m.homeK.toFixed(2), { v: +m.super.toFixed(2), s: 'money' }, +m.superK.toFixed(2), { v: +m.gasto.toFixed(2), s: 'money' }, { v: +(m.home + m.super + m.gasto).toFixed(2), s: 'money' }, Math.round(kmOf(m.homeK + m.superK))];
     });
-    rrows.push([{ v: 'Total', s: 'b' }, { v: +tot.home.toFixed(2), s: 'bmoney' }, +tot.homeK.toFixed(2), { v: +tot.super.toFixed(2), s: 'bmoney' }, +tot.superK.toFixed(2), { v: +tot.gasto.toFixed(2), s: 'bmoney' }, { v: +(tot.home + tot.super + tot.gasto).toFixed(2), s: 'bmoney' }]);
+    rrows.push([{ v: 'Total', s: 'b' }, { v: +tot.home.toFixed(2), s: 'bmoney' }, +tot.homeK.toFixed(2), { v: +tot.super.toFixed(2), s: 'bmoney' }, +tot.superK.toFixed(2), { v: +tot.gasto.toFixed(2), s: 'bmoney' }, { v: +(tot.home + tot.super + tot.gasto).toFixed(2), s: 'bmoney' }, Math.round(kmOf(tot.homeK + tot.superK))]);
 
     const blob = XLSXLite.write([
-      { name: 'Movimientos', cols: [14, 14, 12, 8, 8, 9, 11, 9, 11, 16, 30], rows: [H, ...rows] },
-      { name: 'Resumen', cols: [18, 17, 10, 16, 15, 24, 11], rows: [RH, ...rrows] }
+      { name: 'Movimientos', cols: [14, 14, 12, 8, 8, 9, 14, 11, 9, 11, 16, 30, 24], rows: [H, ...rows] },
+      { name: 'Resumen', cols: [18, 17, 10, 16, 15, 18, 11, 20], rows: [RH, ...rrows] }
     ]);
     const name = `EV3-movimientos-${ymd(new Date())}.xlsx`;
     const file = new File([blob], name, { type: blob.type });
@@ -784,7 +981,7 @@
         const type = /super/.test(tt) ? 'super' : /gasto|mant|recamb|otro|seguro|itv|neum/.test(tt) ? 'gasto' : 'home';
         const cost = num(r[C.coste]); if (isNaN(cost)) continue;
         const o = { id: (C.id >= 0 && r[C.id] != null && String(r[C.id]).trim()) ? String(r[C.id]).trim() : uid(), type, date, cost: +cost.toFixed(4) };
-        if (type === 'gasto') Object.assign(o, { start: '', end: '', kwh: 0, category: C.cat >= 0 ? String(r[C.cat] ?? '') || 'Otros' : 'Otros', concept: C.conc >= 0 ? String(r[C.conc] ?? '') : '' });
+        if (type === 'gasto') Object.assign(o, { start: '', end: '', kwh: 0, category: C.cat >= 0 ? String(r[C.cat] ?? '') || 'Mantenimiento' : 'Mantenimiento', concept: C.conc >= 0 ? String(r[C.conc] ?? '') : '' });
         else {
           const kwh = num(r[C.kwh]);
           o.kwh = isNaN(kwh) ? 0 : +kwh.toFixed(3);

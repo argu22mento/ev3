@@ -376,3 +376,45 @@ video.car-intro::-webkit-media-controls { display: none !important; }
 .hero.gasto .car-static { opacity: 0; transform: var(--ts, scale(.6)); }
 .hero.gasto.intro-play video.car-intro, .hero.gasto.intro-final .car-intro-final { opacity: 1; transform: none; }
 .hero.gasto.intro-final video.car-intro { opacity: 0; transform: none; }
+
+/* ================= v3 ================= */
+html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body { overflow-x: hidden; overscroll-behavior-x: none; }
+body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select { -webkit-user-select: text; user-select: text; font-size: 17px; }
+.car { overflow: hidden; }
+.top { padding-bottom: 2px; }
+.status { margin-top: 8px; }
+
+/* Paneles deslizables */
+.swipe-pane { touch-action: pan-y; will-change: transform; }
+
+/* Supercarga plegable */
+.secondary.wide { width: 100%; margin-bottom: 12px; }
+.secondary.wide svg { stroke-width: 2; }
+.sup-form.reveal { animation: reveal .45s var(--ease); }
+@keyframes reveal { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* Adjuntos */
+.attach { display: inline-flex; min-width: 0; max-width: 62%; justify-content: flex-end; }
+.attach-add {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; color: var(--blue);
+  background: rgba(0,122,255,.08); padding: 6px 12px; border-radius: 999px; cursor: pointer;
+}
+.attach-add svg, .attach-view svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.attach-chip {
+  display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%;
+  background: var(--fill); border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 14px;
+}
+.attach-chip > span, .attach-view span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip button[id$="Clear"], .attach-chip button[id="edDelFile"] {
+  width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.08); font-size: 11px; color: var(--ink-2); flex: none;
+}
+.attach-view { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 500; min-width: 0; font-size: 14px; }
+.clip { display: inline-block; width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; fill: none; stroke: var(--ink-2); stroke-width: 2; stroke-linecap: round; }
+
+.doc-body { background: #F7F6F5; border-radius: 16px; overflow: hidden; margin-bottom: 12px; min-height: 200px; display: grid; place-items: center; }
+.doc-body img { display: block; max-width: 100%; max-height: 60vh; object-fit: contain; }
+.doc-body iframe { width: 100%; height: 60vh; border: 0; background: #fff; }
+.doc-sheet .data-tools { margin-top: 0; }
+#docTitle::first-letter { text-transform: none; }

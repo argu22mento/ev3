@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>EV3 · Carga</title>
   <meta name="description" content="Precio de la luz (REE), recargas, supercargas y gastos del Kia EV3">
   <meta name="theme-color" content="#F2F0EF">
@@ -26,7 +26,6 @@
     <header class="top">
       <div>
         <h1>EV3</h1>
-        <p class="sub">Kia EV3 · 84,1 kWh · 3,7 kW</p>
         <p class="status" id="status"><span class="dot"></span><span id="statusText">En reposo</span></p>
       </div>
       <button class="icon-btn" id="liveBtn" aria-label="Iniciar carga">
@@ -75,6 +74,7 @@
         <span class="seg-thumb"></span>
       </div>
 
+      <div class="swipe-pane" id="paneDay">
       <article class="card price-card">
         <div class="price-head">
           <span class="label" id="priceLabel">Precio ahora</span>
@@ -102,7 +102,8 @@
         <p class="tip-main" id="bestText"></p>
         <p class="muted" id="bestSub"></p>
       </article>
-      <p class="source">Datos: Red Eléctrica · PVPC 2.0TD (península)</p>
+      <p class="source">Datos: Red Eléctrica · PVPC 2.0TD (península) · Desliza para cambiar de día</p>
+      </div>
     </section>
 
     <!-- ============ RECARGAS ============ -->
@@ -123,7 +124,7 @@
 
       <article class="card result">
         <div class="kpis">
-          <div><span class="label">Energía</span><b id="simKwh">—</b><small>kWh</small></div>
+          <div><span class="label">Autonomía ganada</span><b id="simKm">—</b><small id="simKwhNote">km</small></div>
           <div><span class="label">Coste</span><b id="simCost">—</b><small id="simCostNote">€</small></div>
         </div>
         <div class="kpis small">
@@ -137,21 +138,27 @@
       </article>
 
       <h2 class="section-title">Supercarga <small>fuera de casa</small></h2>
-      <article class="card form">
-        <label class="row"><span>Fecha</span><input type="date" id="supDate"></label>
-        <label class="row"><span>Hora</span><input type="time" id="supTime" step="60"></label>
-        <label class="row"><span>Lugar</span><input type="text" id="supPlace" placeholder="Opcional" autocomplete="off"></label>
-        <label class="row"><span>Energía (kWh)</span><input type="text" id="supKwh" inputmode="decimal" placeholder="0,00"></label>
-        <label class="row"><span>Coste (€)</span><input type="text" id="supCost" inputmode="decimal" placeholder="0,00"></label>
-      </article>
-      <article class="card result compact">
-        <div class="kpis small flat3">
-          <div><span class="label">Precio por kWh</span><b id="supAvg">—</b></div>
-          <div><span class="label">Batería</span><b id="supPct">—</b></div>
-          <div><span class="label">vs. casa hoy</span><b id="supVs">—</b></div>
-        </div>
-        <button class="primary" id="supSave" disabled>Añadir supercarga</button>
-      </article>
+      <button class="secondary wide" id="supOpen">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Añadir supercarga
+      </button>
+      <div class="sup-form" id="supForm" hidden>
+        <article class="card form">
+          <label class="row"><span>Fecha</span><input type="date" id="supDate"></label>
+          <label class="row"><span>Hora</span><input type="time" id="supTime" step="60"></label>
+          <label class="row"><span>Lugar</span><input type="text" id="supPlace" placeholder="Opcional" autocomplete="off"></label>
+          <label class="row"><span>Energía (kWh)</span><input type="text" id="supKwh" inputmode="decimal" placeholder="0,00"></label>
+          <label class="row"><span>Coste (€)</span><input type="text" id="supCost" inputmode="decimal" placeholder="0,00"></label>
+        </article>
+        <article class="card result compact">
+          <div class="kpis small flat3">
+            <div><span class="label">Autonomía</span><b id="supKm">—</b></div>
+            <div><span class="label">Precio por kWh</span><b id="supAvg">—</b></div>
+            <div><span class="label">vs. casa hoy</span><b id="supVs">—</b></div>
+          </div>
+          <button class="primary" id="supSave" disabled>Guardar</button>
+          <button class="link" id="supCancel">Cancelar</button>
+        </article>
+      </div>
     </section>
 
     <!-- ============ ACUMULADO ============ -->
@@ -163,6 +170,7 @@
         <span class="seg-thumb"></span>
       </div>
 
+      <div class="swipe-pane" id="panePeriod">
       <div class="filter-chips" id="typeChips" role="group" aria-label="Filtrar por tipo">
         <button data-t="home">Recargas</button>
         <button data-t="super">Supercargas</button>
@@ -178,13 +186,13 @@
       <article class="card">
         <div class="kpis">
           <div><span class="label">Coste total</span><b id="accCost">0</b><small>€</small></div>
-          <div><span class="label">Energía</span><b id="accKwh">0</b><small>kWh</small></div>
+          <div><span class="label">Autonomía ganada</span><b id="accKm">0</b><small>km</small></div>
         </div>
         <div class="split" id="accSplit"></div>
         <div class="kpis small">
           <div><span class="label">Movimientos</span><b id="accN">0</b></div>
-          <div><span class="label">€/kWh medio</span><b id="accAvg">—</b></div>
-          <div><span class="label">≈ Km*</span><b id="accKm">—</b></div>
+          <div><span class="label">€/100 km</span><b id="accPer100">—</b></div>
+          <div><span class="label">Energía</span><b id="accKwh">—</b></div>
         </div>
       </article>
 
@@ -202,7 +210,8 @@
           <input type="file" id="importFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
         </label>
       </div>
-      <p class="source">El Excel exportado incluye todos los movimientos. Súbelo aquí para recuperarlos.<br>* Km estimados con 16 kWh/100 km.</p>
+      <p class="source">El Excel exportado incluye todos los movimientos. Súbelo aquí para recuperarlos.<br>Autonomía estimada con un consumo medio de 18 kWh/100 km.</p>
+      </div>
     </section>
 
     <!-- ============ OTROS GASTOS ============ -->
@@ -213,11 +222,19 @@
         <label class="row"><span>Categoría</span>
           <select id="gCat">
             <option>Mantenimiento</option><option>Recambios</option><option>Neumáticos</option><option>Seguro</option>
-            <option>ITV / Impuestos</option><option>Limpieza</option><option>Accesorios</option><option>Otros</option>
+            <option>ITV / Impuestos</option><option>Limpieza</option>
           </select>
         </label>
         <label class="row"><span>Concepto</span><input type="text" id="gConcept" placeholder="Ej. Revisión 30.000 km" autocomplete="off"></label>
         <label class="row"><span>Importe (€)</span><input type="text" id="gAmount" inputmode="decimal" placeholder="0,00"></label>
+        <div class="row">
+          <span>Adjunto <small class="row-note">PDF o imagen · opcional</small></span>
+          <span class="attach" id="gAttach">
+            <label class="attach-add"><input type="file" id="gFile" accept="application/pdf,image/*" hidden>
+              <svg viewBox="0 0 24 24"><path d="M20.5 11.5 12.4 19.6a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>Adjuntar</label>
+            <span class="attach-chip" id="gFileChip" hidden><span id="gFileName"></span><button type="button" id="gFileClear" aria-label="Quitar adjunto">✕</button></span>
+          </span>
+        </div>
         <button class="primary" id="gSave" disabled>Añadir gasto</button>
       </article>
 
@@ -246,6 +263,20 @@
     <div class="stats" id="psStats"></div>
   </div>
 
+  <!-- Visor de adjuntos -->
+  <div class="sheet doc-sheet" id="docSheet" role="dialog" aria-modal="true" aria-labelledby="docTitle">
+    <div class="grabber"></div>
+    <div class="sheet-head">
+      <h2 id="docTitle">Adjunto</h2>
+      <button class="close" data-close aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="doc-body" id="docBody"></div>
+    <div class="data-tools">
+      <button class="secondary" id="docOpen"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></svg>Abrir</button>
+      <button class="secondary" id="docShare"><svg viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M5 13v6h14v-6"/></svg>Guardar / compartir</button>
+    </div>
+  </div>
+
   <!-- Hoja de edición -->
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
     <div class="grabber"></div>
@@ -262,12 +293,13 @@
       <label class="row" data-for="gasto"><span>Categoría</span>
         <select id="edCat">
           <option>Mantenimiento</option><option>Recambios</option><option>Neumáticos</option><option>Seguro</option>
-          <option>ITV / Impuestos</option><option>Limpieza</option><option>Accesorios</option><option>Otros</option>
+          <option>ITV / Impuestos</option><option>Limpieza</option>
         </select>
       </label>
       <label class="row" data-for="gasto"><span>Concepto</span><input type="text" id="edConcept" autocomplete="off"></label>
+      <div class="row" data-for="gasto"><span>Adjunto</span><span class="attach" id="edAttach"></span></div>
       <div class="row" data-for="home"><span>Bono social <small class="row-note">−50 %</small></span><label class="switch"><input type="checkbox" id="edBono"><i></i></label></div>
-      <label class="row" data-for="home super"><span>Energía (kWh)</span><input type="text" id="edKwh" inputmode="decimal"></label>
+      <label class="row" data-for="home super"><span>Energía (kWh) <small class="row-note" id="edKmNote"></small></span><input type="text" id="edKwh" inputmode="decimal"></label>
       <label class="row"><span id="edCostLabel">Coste (€)</span><input type="text" id="edCost" inputmode="decimal"></label>
     </div>
     <button class="link" id="edRecalc" data-for="home">Recalcular con precios REE</button>
