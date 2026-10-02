@@ -70,7 +70,7 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
 .car { position: relative; height: 100%; }
 /* Todas las capas del coche ocupan la misma caja y se ajustan con object-fit: así el "morphing" solo
    necesita transform (translate + scale) calculado en JS a partir de la posición del coche en cada imagen */
-.car-static, .car-intro, .car-img {
+.car-static, .car-img {
   position: absolute; inset: 0; width: 100%; height: 100%;
   transform-origin: 50% 50%;
 }
@@ -78,8 +78,6 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
 .car-img {
   object-fit: contain;
   transition: opacity .8s var(--ease);
-  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 78%, transparent 100%);
-          mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 78%, transparent 100%);
   user-select: none; -webkit-user-drag: none;
 }
 .car-img.cargando, .car-img.lit { opacity: 0; }
@@ -365,18 +363,6 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
 .lvtxt.b { color: #248A3D; } .lvtxt.m { color: #C93400; } .lvtxt.c { color: #D70015; } .lvtxt.na { color: var(--ink-3); }
 #priceSheet .stats { margin-top: 14px; border-top: 0; padding-top: 4px; }
 
-/* Animación de entrada · Otros gastos (morphing entre coche fijo y vídeo) */
-.car-intro {
-  object-fit: contain; opacity: 0; pointer-events: none;
-  transform: var(--tv, scale(1.6));
-  transition: transform .8s var(--ease), opacity .55s var(--ease) .1s;
-  will-change: transform, opacity;
-}
-video.car-intro::-webkit-media-controls { display: none !important; }
-.hero.gasto .car-static { opacity: 0; transform: var(--ts, scale(.6)); }
-.hero.gasto.intro-play video.car-intro, .hero.gasto.intro-final .car-intro-final { opacity: 1; transform: none; }
-.hero.gasto.intro-final video.car-intro { opacity: 0; transform: none; }
-
 /* ================= v3 ================= */
 html { touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 html, body { overflow-x: hidden; overscroll-behavior-x: none; }
@@ -431,7 +417,7 @@ html[data-theme="dark"] .car-img.night.n-off { transition: opacity 1.1s var(--ea
 .car-img.reposo, .car-img.cargando { transition: opacity .8s var(--ease), filter 1.1s ease; }
 html[data-theme="dark"] .car-img.reposo,
 html[data-theme="dark"] .car-img.cargando,
-html[data-theme="dark"] .car-img.lit { opacity: 0 !important; animation: none !important; filter: brightness(.066); transition: opacity .7s ease .5s, filter 1.1s ease; }
+html[data-theme="dark"] .car-img.lit { opacity: 0 !important; animation: none !important; transition: opacity .9s ease .25s; }
 html[data-theme="dark"] .car-img.reposo-n.n-off { opacity: 1; }
 html[data-theme="dark"] .charging .car-img.reposo-n.n-off { opacity: 0; }
 html[data-theme="dark"] .charging .car-img.cargando-n.n-off { opacity: 1; }
@@ -445,9 +431,6 @@ html[data-theme="dark"].lights .charging .car-img.cargando-n.n-on { opacity: 1; 
 }
 html[data-theme="dark"] .hero.blink .car-img.lit-n { animation: blink 1.5s linear both; transition: none; }
 
-.car-intro-final.night { display: none; }
-html[data-theme="dark"] .car-intro-final.day { display: none; }
-html[data-theme="dark"] .car-intro-final.night { display: block; }
 
 /* Luz que proyectan los faros sobre la interfaz (y reflejo rojo trasero) */
 .app { position: relative; }
@@ -461,7 +444,6 @@ html[data-theme="dark"] .car-intro-final.night { display: block; }
     radial-gradient(ellipse var(--bw, 150px) var(--bh, 70px) at var(--bx, 50%) var(--by, 600px), rgba(255,40,40,.16), rgba(255,30,30,.05) 50%, transparent 75%);
 }
 html[data-theme="dark"].lights .night-glow { opacity: 1; transition: opacity 1.4s ease .35s; }
-html[data-theme="dark"].lights.gasto-view .night-glow { opacity: .45; }
 
 /* Paleta oscura */
 html[data-theme="dark"] {
@@ -509,3 +491,27 @@ html.theme-anim .price-big, html.theme-anim .status, html.theme-anim .attach-add
 }
 /* las imágenes nocturnas ya llevan el fundido al color de fondo */
 .car-img.night { -webkit-mask-image: none; mask-image: none; }
+
+/* ================= v5 ================= */
+/* Icono de carga activo: azul eléctrico (el de luces sigue en verde) */
+.icon-btn#liveBtn.on svg { stroke: #0A84FF; filter: drop-shadow(0 0 4px rgba(10,132,255,.55)); }
+
+/* Otros gastos: ruedas y herramientas alrededor del coche (el coche no se mueve) */
+.gi-layer { position: absolute; inset: 0; pointer-events: none; }
+.gi {
+  position: absolute; display: block; opacity: 0;
+  transform: translateX(var(--ox, 0px)) scale(var(--s0, 1));
+  transition: transform .55s var(--ease) var(--dout, 0s), opacity .35s ease var(--dout, 0s);
+  will-change: transform, opacity;
+}
+.gi.tool { filter: drop-shadow(-3px 5px 5px rgba(0,0,0,.18)); }
+.hero.gasto .gi { opacity: 1; transform: none; transition-delay: var(--din, 0s); }
+.gi img { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 1s ease; }
+.gi img.n { opacity: 0; }
+html[data-theme="dark"] .gi img.d { opacity: 0; }
+html[data-theme="dark"] .gi img.n { opacity: 1; filter: brightness(1.7); }
+html[data-theme="dark"] .gi.tool { filter: none; }
+
+/* Hojas inferiores: arrastrar hacia abajo para cerrar */
+.sheet.dragging { transition: none !important; }
+.sheet .grabber { cursor: grab; padding-top: 0; }

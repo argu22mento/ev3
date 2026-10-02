@@ -15,8 +15,8 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="preload" as="image" href="/ev3-reposo.jpg">
-  <link rel="preload" as="image" href="/ev3-intermitentes.jpg">
+  <link rel="preload" as="image" href="/ev3-reposo.webp">
+  <link rel="preload" as="image" href="/ev3-intermitentes.webp">
   <link rel="stylesheet" href="/styles.css">
   <script>
     // Aplica el tema guardado antes de pintar (sin parpadeo)
@@ -63,20 +63,30 @@
         </button>
       </nav>
       <div class="car" id="car">
-        <div class="car-static">
-          <img class="car-img reposo" src="/ev3-reposo.jpg" alt="Kia EV3 en reposo" decoding="async">
-          <img class="car-img cargando" src="/ev3-cargando.jpg" alt="Kia EV3 cargando" decoding="async">
-          <img class="car-img lit" src="/ev3-intermitentes.jpg" alt="" aria-hidden="true" decoding="async">
-          <!-- Modo oscuro: coche de noche con luces apagadas (n-off) y encendidas (n-on) -->
-          <img class="car-img night n-off reposo-n" src="/ev3-noche-off.jpg" alt="" aria-hidden="true" decoding="async">
-          <img class="car-img night n-on reposo-n" src="/ev3-noche.jpg" alt="" aria-hidden="true" decoding="async">
-          <img class="car-img night n-off cargando-n" src="/ev3-noche-cargando-off.jpg" alt="" aria-hidden="true" decoding="async">
-          <img class="car-img night n-on cargando-n" src="/ev3-noche-cargando.jpg" alt="" aria-hidden="true" decoding="async">
-          <img class="car-img night lit-n" src="/ev3-intermitentes-noche.jpg" alt="" aria-hidden="true" decoding="async">
+        <!-- Otros gastos: ruedas (bajo el coche) y herramientas (alrededor), animadas sin mover el coche -->
+        <div class="gi-layer" aria-hidden="true">
+          <span class="gi wheel" data-k="wheel-fl"><img class="d" src="/gi-wheel-fl.webp" alt=""><img class="n" src="/gi-wheel-fl-n.webp" alt=""></span>
+          <span class="gi wheel" data-k="wheel-fr"><img class="d" src="/gi-wheel-fr.webp" alt=""><img class="n" src="/gi-wheel-fr-n.webp" alt=""></span>
+          <span class="gi wheel" data-k="wheel-rl"><img class="d" src="/gi-wheel-rl.webp" alt=""><img class="n" src="/gi-wheel-rl-n.webp" alt=""></span>
+          <span class="gi wheel" data-k="wheel-rr"><img class="d" src="/gi-wheel-rr.webp" alt=""><img class="n" src="/gi-wheel-rr-n.webp" alt=""></span>
         </div>
-        <video class="car-intro" id="gastoVideo" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
-        <img class="car-intro car-intro-final day" src="/gasto-final.jpg" alt="Kia EV3 con herramientas" decoding="async">
-        <img class="car-intro car-intro-final night" src="/gasto-final-noche.jpg" alt="" aria-hidden="true" decoding="async">
+        <div class="car-static">
+          <img class="car-img reposo" src="/ev3-reposo.webp" alt="Kia EV3 en reposo" decoding="async">
+          <img class="car-img cargando" src="/ev3-cargando.webp" alt="Kia EV3 cargando" decoding="async">
+          <img class="car-img lit" src="/ev3-intermitentes.webp" alt="" aria-hidden="true" decoding="async">
+          <!-- Modo oscuro: coche de noche con luces apagadas (n-off) y encendidas (n-on) -->
+          <img class="car-img night n-off reposo-n" src="/ev3-noche-off.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-on reposo-n" src="/ev3-noche.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-off cargando-n" src="/ev3-noche-cargando-off.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-on cargando-n" src="/ev3-noche-cargando.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night lit-n" src="/ev3-intermitentes-noche.webp" alt="" aria-hidden="true" decoding="async">
+        </div>
+        <div class="gi-layer" aria-hidden="true">
+          <span class="gi tool" data-k="toolbox"><img class="d" src="/gi-toolbox.webp" alt=""><img class="n" src="/gi-toolbox-n.webp" alt=""></span>
+          <span class="gi tool" data-k="ratchet"><img class="d" src="/gi-ratchet.webp" alt=""><img class="n" src="/gi-ratchet-n.webp" alt=""></span>
+          <span class="gi tool" data-k="jack"><img class="d" src="/gi-jack.webp" alt=""><img class="n" src="/gi-jack-n.webp" alt=""></span>
+          <span class="gi tool" data-k="gloves"><img class="d" src="/gi-gloves.webp" alt=""><img class="n" src="/gi-gloves-n.webp" alt=""></span>
+        </div>
       </div>
     </section>
 

@@ -170,6 +170,40 @@
   $$('[data-close]').forEach(b => b.addEventListener('click', closeSheet));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
 
+  // Deslizar hacia abajo para cerrar cualquier hoja inferior (cancela la edición)
+  function attachSheetDrag(sheet) {
+    const bd = $('#sheetBackdrop');
+    let y0 = 0, dy = 0, t0 = 0, drag = false, cand = false;
+    sheet.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1 || e.target.closest('input, select, textarea, iframe, .switch')) { cand = false; return; }
+      cand = sheet.scrollTop <= 0; y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); drag = false;
+    }, { passive: true });
+    sheet.addEventListener('touchmove', e => {
+      if (!cand) return;
+      const d = e.touches[0].clientY - y0;
+      if (!drag) {
+        if (d > 8 && sheet.scrollTop <= 0) { drag = true; sheet.classList.add('dragging'); }
+        else { if (d < -4) cand = false; return; }
+      }
+      e.preventDefault();
+      dy = Math.max(0, d);
+      const h = sheet.offsetHeight;
+      sheet.style.transform = `translateY(${dy}px)`;
+      bd.style.transition = 'none'; bd.style.opacity = String(Math.max(0, 1 - dy / (h * 0.9)));
+    }, { passive: false });
+    const end = () => {
+      if (!drag) { cand = false; return; }
+      drag = false; cand = false;
+      const v = dy / Math.max(1, Date.now() - t0), close = dy > sheet.offsetHeight * 0.22 || (v > 0.55 && dy > 40);
+      sheet.classList.remove('dragging');
+      bd.style.transition = ''; bd.style.opacity = '';
+      sheet.style.transform = '';
+      if (close) closeSheet();
+    };
+    sheet.addEventListener('touchend', end); sheet.addEventListener('touchcancel', end);
+  }
+  $$('.sheet').forEach(attachSheetDrag);
+
   // ---------- Adjuntos (IndexedDB: los archivos no caben en localStorage) ----------
   const files = (() => {
     let dbp = null;
@@ -331,32 +365,57 @@
   }
   $$('.rail-btn').forEach(b => b.addEventListener('click', () => { go(b.dataset.view); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
 
-  // ---------- Coche: morphing entre apartados + animación de entrada (Otros gastos) ----------
-  const hero = $('.hero'), carBox = $('#car'), introVid = $('#gastoVideo');
+  // ---------- Coche + animación de «Otros gastos» (el coche no se mueve) ----------
+  const hero = $('.hero'), carBox = $('#car');
   const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Posición del coche dentro de cada imagen (fracciones): centro, largo y proporción del archivo
-  const GEO = {
-    still: { ar: 478 / 1024, cx: 0.523, cy: 0.464, len: 0.793 },
-    video: { ar: 640 / 554, cx: 0.556, cy: 0.470, len: 0.818 }
+  // Coche dentro de la foto (fracciones): proporción del archivo, centro de la carrocería y largo
+  const STILL = { ar: 478 / 1024, cx: 0.535, cy: 0.4644, len: 0.794 };
+  // Coche en el último fotograma del vídeo original (px): centro y largo; de ahí salen ruedas y herramientas
+  const VCAR = { cx: 363, cy: 256, len: 486 };
+  const GI = {
+    'wheel-fl': { box: [226, 92, 42, 96], side: -1, din: 0.00, dout: 0.42 },
+    'wheel-fr': { box: [451, 92, 49, 96], side: 1, din: 0.07, dout: 0.36 },
+    'wheel-rl': { box: [226, 364, 42, 96], side: -1, din: 0.14, dout: 0.30 },
+    'wheel-rr': { box: [451, 364, 49, 96], side: 1, din: 0.21, dout: 0.24 },
+    toolbox: { box: [2, 240, 126, 100], zone: -1, v: -0.03, din: 0.42, dout: 0.14 },
+    ratchet: { box: [136, 240, 26, 98], zone: -1, v: 0.17, din: 0.52, dout: 0.10 },
+    jack: { box: [524, 378, 110, 74], zone: 1, v: 0.22, din: 0.58, dout: 0.06 },
+    gloves: { box: [511, 456, 86, 70], zone: 1, v: 0.38, din: 0.68, dout: 0.00 }
   };
-  function carRect(g, W, H) {
-    let w, h; if (W / H > g.ar) { h = H; w = H * g.ar; } else { w = W; h = W / g.ar; }
-    return { x: (W - w) / 2 + g.cx * w, y: (H - h) / 2 + g.cy * h, len: g.len * h };
-  }
-  // transform que coloca el coche de "from" exactamente encima del coche de "to"
-  function morph(from, to, W, H) {
-    const a = carRect(from, W, H), b = carRect(to, W, H), s = b.len / a.len;
-    const tx = b.x - W / 2 - s * (a.x - W / 2), ty = b.y - H / 2 - s * (a.y - H / 2);
-    return `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) scale(${s.toFixed(4)})`;
+  function stillFit(W, H) {
+    let iw, ih; if (W / H > STILL.ar) { ih = H; iw = H * STILL.ar; } else { iw = W; ih = W / STILL.ar; }
+    return { iw, ih, ox: (W - iw) / 2, oy: (H - ih) / 2 };
   }
   function layoutMorph() {
     const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
-    carBox.style.setProperty('--tv', morph(GEO.video, GEO.still, W, H));
-    carBox.style.setProperty('--ts', morph(GEO.still, GEO.video, W, H));
-    // Posición de faros y pilotos en la página (para la luz proyectada en modo oscuro)
+    const { iw, ih, ox: fox, oy: foy } = stillFit(W, H);
+    // --- ruedas y herramientas, a la escala exacta del coche ---
+    const L = STILL.len * ih, cx = fox + STILL.cx * iw, cy = foy + STILL.cy * ih, k = L / VCAR.len;
+    const wheelOut = 0.29 * L;                                  // las ruedas sobresalen ±0,28 del largo
+    const zoneL = [4, cx - wheelOut - 6], zoneR = [cx + wheelOut + 6, W - 4];
+    const zw = z => Math.max(20, z[1] - z[0]);
+    const kL = Math.min(k, zw(zoneL) * 0.94 / GI.toolbox.box[2]);
+    const kR = Math.min(k, zw(zoneR) * 0.94 / GI.jack.box[2]);
+    $$('.gi').forEach(el => {
+      const g = GI[el.dataset.k]; if (!g) return;
+      const [x, y, w, h] = g.box;
+      let left, top, ww, hh, off;
+      if (g.side) {                                             // rueda: posición real respecto al coche
+        ww = w * k; hh = h * k; left = cx + (x - VCAR.cx) * k; top = cy + (y - VCAR.cy) * k;
+        off = -g.side * ww * 0.95;                              // sale de debajo de la carrocería
+      } else {                                                  // herramienta: en el hueco libre a cada lado
+        const kk = g.zone < 0 ? kL : kR, z = g.zone < 0 ? zoneL : zoneR;
+        ww = w * kk; hh = h * kk; left = (z[0] + z[1]) / 2 - ww / 2; top = cy + g.v * L - hh / 2;
+        off = g.zone * 18;
+      }
+      Object.assign(el.style, { left: left + 'px', top: top + 'px', width: ww + 'px', height: hh + 'px' });
+      el.style.setProperty('--ox', off + 'px');
+      el.style.setProperty('--s0', g.side ? '1' : '.9');
+      el.style.setProperty('--din', g.din + 's'); el.style.setProperty('--dout', g.dout + 's');
+    });
+    // --- posición de faros y pilotos en la página (luz proyectada en modo oscuro) ---
     const app = $('.app'), r = carBox.getBoundingClientRect(), ar = app.getBoundingClientRect();
-    const g = GEO.still; let iw, ih; if (W / H > g.ar) { ih = H; iw = H * g.ar; } else { iw = W; ih = W / g.ar; }
-    const ox = r.left - ar.left + (W - iw) / 2, oy = r.top - ar.top + (H - ih) / 2;
+    const ox = r.left - ar.left + fox, oy = r.top - ar.top + foy;
     const P = (fx, fy) => [ox + fx * iw, oy + fy * ih];
     const [fx, fy] = P(0.53, 0.05), [lx] = P(0.23, 0.12), [rx] = P(0.83, 0.12), [bx, by] = P(0.52, 0.96);
     const st = app.style;
@@ -368,34 +427,14 @@
   }
   window.addEventListener('resize', layoutMorph);
 
-  let introTimer = null;
-  function introFinal() { if (view !== 'gastos') return; hero.classList.remove('intro-play'); hero.classList.add('gasto', 'intro-final'); }
-  const canMp4 = !!introVid.canPlayType('video/mp4; codecs="avc1.640028"');
-  function introSrc() { return `/gasto-intro${isDark() ? '-noche' : ''}.${canMp4 ? 'mp4' : 'webm'}`; }
-  function ensureIntroSrc() {
-    const src = introSrc();
-    if (introVid.dataset.src !== src) { introVid.dataset.src = src; introVid.src = src; try { introVid.load(); } catch {} }
-  }
+  // Entrar en «Otros gastos»: salen las ruedas y aparecen las herramientas · salir: lo mismo al revés
   function playIntro() {
-    clearTimeout(introTimer);
     layoutMorph();
-    ensureIntroSrc();
-    hero.classList.remove('intro-final', 'intro-play');
-    if (reducedMotion) { introFinal(); return; }
-    try { introVid.pause(); introVid.currentTime = 0; } catch {}
-    // El morph empieza cuando el vídeo ya está en marcha (su primer segundo es el coche solo)
-    const onPlaying = () => { clearTimeout(introTimer); if (view === 'gastos') hero.classList.add('gasto', 'intro-play'); };
-    introVid.addEventListener('playing', onPlaying, { once: true });
-    const p = introVid.play();
-    if (p && p.catch) p.catch(() => { introVid.removeEventListener('playing', onPlaying); introFinal(); });
-    introTimer = setTimeout(() => { if (!hero.classList.contains('intro-play')) { introVid.removeEventListener('playing', onPlaying); introFinal(); } }, 2000);
+    if (hero.classList.contains('gasto')) return;
+    void carBox.offsetWidth;
+    hero.classList.add('gasto');
   }
-  function stopIntro() {
-    clearTimeout(introTimer);
-    hero.classList.remove('gasto', 'intro-play', 'intro-final');
-    setTimeout(() => { if (view !== 'gastos') try { introVid.pause(); } catch {} }, 850);
-  }
-  // Al terminar, el vídeo se queda en su último fotograma (sin bucle)
+  function stopIntro() { hero.classList.remove('gasto'); }
 
   // ---------- Modo oscuro (luces cortas) ----------
   const root = document.documentElement;
@@ -412,21 +451,14 @@
     root.classList.add('theme-anim');
     themeAnimT = setTimeout(() => root.classList.remove('theme-anim'), 1700);
     store.set('ev3.theme', dark ? 'dark' : 'light');
-    const swapIntro = () => {
-      if (view !== 'gastos') return;
-      // en «Otros gastos» se pasa directamente al último fotograma del tema nuevo
-      try { introVid.pause(); } catch {}
-      hero.classList.remove('intro-play'); hero.classList.add('gasto', 'intro-final');
-      ensureIntroSrc();
-    };
     if (dark) {
       // 1) la luz ambiente se apaga poco a poco · 2) se encienden los faros
-      root.dataset.theme = 'dark'; root.classList.remove('lights'); themeUI(); swapIntro();
+      root.dataset.theme = 'dark'; root.classList.remove('lights'); themeUI();
       themeT = setTimeout(() => { if (isDark()) root.classList.add('lights'); }, reducedMotion ? 0 : 1050);
     } else {
       // 1) se apagan los faros · 2) vuelve la luz
       root.classList.remove('lights');
-      themeT = setTimeout(() => { delete root.dataset.theme; themeUI(); swapIntro(); }, reducedMotion ? 0 : 380);
+      themeT = setTimeout(() => { delete root.dataset.theme; themeUI(); }, reducedMotion ? 0 : 380);
     }
   }
   $('#themeBtn').addEventListener('click', () => setTheme(!isDark()));
