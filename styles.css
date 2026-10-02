@@ -418,3 +418,94 @@ input, textarea, select { -webkit-user-select: text; user-select: text; font-siz
 .doc-body iframe { width: 100%; height: 60vh; border: 0; background: #fff; }
 .doc-sheet .data-tools { margin-top: 0; }
 #docTitle::first-letter { text-transform: none; }
+
+/* ================= v4 · Modo oscuro ================= */
+.top-actions { display: flex; gap: 2px; }
+.icon-btn#themeBtn.on svg { stroke: var(--green); }
+
+/* Capas nocturnas del coche */
+.car-img.night { opacity: 0; transition: opacity .4s ease; }
+html[data-theme="dark"] .car-img.night.n-off { transition: opacity 1.1s var(--ease); }
+.car-img.day-only { }
+/* La foto de día se "apaga" al mismo ritmo que el fondo y luego deja paso a la de noche */
+.car-img.reposo, .car-img.cargando { transition: opacity .8s var(--ease), filter 1.1s ease; }
+html[data-theme="dark"] .car-img.reposo,
+html[data-theme="dark"] .car-img.cargando,
+html[data-theme="dark"] .car-img.lit { opacity: 0 !important; animation: none !important; filter: brightness(.066); transition: opacity .7s ease .5s, filter 1.1s ease; }
+html[data-theme="dark"] .car-img.reposo-n.n-off { opacity: 1; }
+html[data-theme="dark"] .charging .car-img.reposo-n.n-off { opacity: 0; }
+html[data-theme="dark"] .charging .car-img.cargando-n.n-off { opacity: 1; }
+/* Luces: se encienden con un pequeño parpadeo, como los LED */
+.car-img.n-on { transition: opacity .45s ease; }
+html[data-theme="dark"].lights .car-img.reposo-n.n-on { opacity: 1; animation: lightsOn 1.1s linear both; }
+html[data-theme="dark"].lights .charging .car-img.reposo-n.n-on { opacity: 0; animation: none; }
+html[data-theme="dark"].lights .charging .car-img.cargando-n.n-on { opacity: 1; animation: lightsOn 1.1s linear both; }
+@keyframes lightsOn {
+  0% { opacity: 0; } 6% { opacity: .75; } 10% { opacity: .1; } 17% { opacity: .9; } 22% { opacity: .45; } 34% { opacity: 1; } 100% { opacity: 1; }
+}
+html[data-theme="dark"] .hero.blink .car-img.lit-n { animation: blink 1.5s linear both; transition: none; }
+
+.car-intro-final.night { display: none; }
+html[data-theme="dark"] .car-intro-final.day { display: none; }
+html[data-theme="dark"] .car-intro-final.night { display: block; }
+
+/* Luz que proyectan los faros sobre la interfaz (y reflejo rojo trasero) */
+.app { position: relative; }
+.night-glow {
+  position: absolute; inset: 0; pointer-events: none; z-index: 15; opacity: 0;
+  mix-blend-mode: screen; transition: opacity .5s ease;
+  background:
+    radial-gradient(ellipse var(--fw, 160px) var(--fh, 150px) at var(--fx, 50%) var(--fy, 180px), rgba(225,235,255,.20), rgba(225,235,255,.07) 45%, transparent 72%),
+    radial-gradient(ellipse calc(var(--fw, 160px) * .55) calc(var(--fh, 150px) * .8) at var(--lx, 40%) var(--fy, 180px), rgba(235,242,255,.12), transparent 70%),
+    radial-gradient(ellipse calc(var(--fw, 160px) * .55) calc(var(--fh, 150px) * .8) at var(--rx, 60%) var(--fy, 180px), rgba(235,242,255,.12), transparent 70%),
+    radial-gradient(ellipse var(--bw, 150px) var(--bh, 70px) at var(--bx, 50%) var(--by, 600px), rgba(255,40,40,.16), rgba(255,30,30,.05) 50%, transparent 75%);
+}
+html[data-theme="dark"].lights .night-glow { opacity: 1; transition: opacity 1.4s ease .35s; }
+html[data-theme="dark"].lights.gasto-view .night-glow { opacity: .45; }
+
+/* Paleta oscura */
+html[data-theme="dark"] {
+  --bg: #101215;
+  --card: #1C1C1E;
+  --ink: #F5F5F7;
+  --ink-2: #A1A1A6;
+  --ink-3: #6E6E73;
+  --icon: #4A4A4F;
+  --hair: rgba(255, 255, 255, .09);
+  --fill: rgba(118, 118, 128, .24);
+  --shadow: 0 0 0 1px rgba(255,255,255,.04);
+  color-scheme: dark;
+}
+html[data-theme="dark"] .card.flat,
+html[data-theme="dark"] .ptable,
+html[data-theme="dark"] .ptr.head,
+html[data-theme="dark"] .doc-body { background: #2C2C2E; }
+html[data-theme="dark"] .seg-thumb { background: #636366; box-shadow: 0 3px 8px rgba(0,0,0,.3); }
+html[data-theme="dark"] .primary { background: #F5F5F7; color: #1D1D1F; }
+html[data-theme="dark"] .filter-chips button.on { background: #F5F5F7; color: #1D1D1F; }
+html[data-theme="dark"] .ptr em { color: #1D1D1F; }
+html[data-theme="dark"] .sheet { background: #1C1C1E; box-shadow: 0 -10px 40px rgba(0,0,0,.6); }
+html[data-theme="dark"] .sheet-backdrop, html[data-theme="dark"] .alert-backdrop { background: rgba(0,0,0,.55); }
+html[data-theme="dark"] .alert { background: rgba(44,44,46,.96); }
+html[data-theme="dark"] .toast, html[data-theme="dark"] .tooltip { background: rgba(58,58,60,.95); }
+html[data-theme="dark"] .badge.b, html[data-theme="dark"] .lvtxt.b, html[data-theme="dark"] .tag { color: #30D158; }
+html[data-theme="dark"] .badge.m, html[data-theme="dark"] .lvtxt.m, html[data-theme="dark"] .warn { color: #FF9F0A; }
+html[data-theme="dark"] .badge.c, html[data-theme="dark"] .lvtxt.c { color: #FF453A; }
+html[data-theme="dark"] .rail-btn.active svg { stroke: #F5F5F7; }
+html[data-theme="dark"] .list .ic { background: #2C2C2E; }
+html[data-theme="dark"] .grabber { background: rgba(235,235,245,.3); }
+html[data-theme="dark"] .attach-add { background: rgba(10,132,255,.16); color: #0A84FF; }
+html[data-theme="dark"] .link, html[data-theme="dark"] .data-tools label, html[data-theme="dark"] .attach-view { color: #0A84FF; }
+html[data-theme="dark"] .chart .bar.now::after { background: #F5F5F7; }
+
+/* Transición suave de toda la interfaz al cambiar de tema */
+html.theme-anim body, html.theme-anim .card, html.theme-anim .seg, html.theme-anim .seg-thumb, html.theme-anim .primary,
+html.theme-anim .secondary, html.theme-anim .filter-chips button, html.theme-anim .badge, html.theme-anim .row input,
+html.theme-anim .row select, html.theme-anim .chips button, html.theme-anim .list .ic, html.theme-anim .icon-btn svg,
+html.theme-anim .rail-btn svg, html.theme-anim .rail-sep, html.theme-anim h1, html.theme-anim h2, html.theme-anim .label,
+html.theme-anim .muted, html.theme-anim .source, html.theme-anim .list li, html.theme-anim .kpis b, html.theme-anim .stats b,
+html.theme-anim .price-big, html.theme-anim .status, html.theme-anim .attach-add, html.theme-anim .split-legend {
+  transition: background-color 1.1s ease, color 1.1s ease, border-color 1.1s ease, box-shadow 1.1s ease, stroke 1.1s ease !important;
+}
+/* las imágenes nocturnas ya llevan el fundido al color de fondo */
+.car-img.night { -webkit-mask-image: none; mask-image: none; }

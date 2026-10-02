@@ -325,6 +325,7 @@
     if (v === 'inicio') renderInicio();
     if (v === 'simulador') renderSim();
     if (v === 'acumulado') { typeFilter.clear(); typeFilter.add('home'); renderAcc(); }
+    document.documentElement.classList.toggle('gasto-view', v === 'gastos');
     if (v === 'gastos') { renderGastos(); playIntro(); } else stopIntro();
     try { history.replaceState(null, '', v === 'inicio' ? location.pathname : '#' + v); } catch {}
   }
@@ -352,14 +353,33 @@
     const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
     carBox.style.setProperty('--tv', morph(GEO.video, GEO.still, W, H));
     carBox.style.setProperty('--ts', morph(GEO.still, GEO.video, W, H));
+    // Posición de faros y pilotos en la página (para la luz proyectada en modo oscuro)
+    const app = $('.app'), r = carBox.getBoundingClientRect(), ar = app.getBoundingClientRect();
+    const g = GEO.still; let iw, ih; if (W / H > g.ar) { ih = H; iw = H * g.ar; } else { iw = W; ih = W / g.ar; }
+    const ox = r.left - ar.left + (W - iw) / 2, oy = r.top - ar.top + (H - ih) / 2;
+    const P = (fx, fy) => [ox + fx * iw, oy + fy * ih];
+    const [fx, fy] = P(0.53, 0.05), [lx] = P(0.23, 0.12), [rx] = P(0.83, 0.12), [bx, by] = P(0.52, 0.96);
+    const st = app.style;
+    st.setProperty('--fx', fx + 'px'); st.setProperty('--fy', fy + 'px');
+    st.setProperty('--lx', lx + 'px'); st.setProperty('--rx', rx + 'px');
+    st.setProperty('--fw', (iw * 1.25) + 'px'); st.setProperty('--fh', (ih * 0.34) + 'px');
+    st.setProperty('--bx', bx + 'px'); st.setProperty('--by', by + 'px');
+    st.setProperty('--bw', (iw * 0.95) + 'px'); st.setProperty('--bh', (ih * 0.13) + 'px');
   }
   window.addEventListener('resize', layoutMorph);
 
   let introTimer = null;
   function introFinal() { if (view !== 'gastos') return; hero.classList.remove('intro-play'); hero.classList.add('gasto', 'intro-final'); }
+  const canMp4 = !!introVid.canPlayType('video/mp4; codecs="avc1.640028"');
+  function introSrc() { return `/gasto-intro${isDark() ? '-noche' : ''}.${canMp4 ? 'mp4' : 'webm'}`; }
+  function ensureIntroSrc() {
+    const src = introSrc();
+    if (introVid.dataset.src !== src) { introVid.dataset.src = src; introVid.src = src; try { introVid.load(); } catch {} }
+  }
   function playIntro() {
     clearTimeout(introTimer);
     layoutMorph();
+    ensureIntroSrc();
     hero.classList.remove('intro-final', 'intro-play');
     if (reducedMotion) { introFinal(); return; }
     try { introVid.pause(); introVid.currentTime = 0; } catch {}
@@ -377,6 +397,41 @@
   }
   // Al terminar, el vídeo se queda en su último fotograma (sin bucle)
 
+  // ---------- Modo oscuro (luces cortas) ----------
+  const root = document.documentElement;
+  function isDark() { return root.dataset.theme === 'dark'; }
+  let themeT = null, themeAnimT = null;
+  function themeUI() {
+    const d = isDark(), b = $('#themeBtn');
+    b.classList.toggle('on', d); b.setAttribute('aria-pressed', String(d));
+    b.setAttribute('aria-label', d ? 'Desactivar modo oscuro' : 'Activar modo oscuro');
+    const m = $('meta[name=theme-color]'); if (m) m.content = d ? '#101215' : '#F2F0EF';
+  }
+  function setTheme(dark) {
+    clearTimeout(themeT); clearTimeout(themeAnimT);
+    root.classList.add('theme-anim');
+    themeAnimT = setTimeout(() => root.classList.remove('theme-anim'), 1700);
+    store.set('ev3.theme', dark ? 'dark' : 'light');
+    const swapIntro = () => {
+      if (view !== 'gastos') return;
+      // en «Otros gastos» se pasa directamente al último fotograma del tema nuevo
+      try { introVid.pause(); } catch {}
+      hero.classList.remove('intro-play'); hero.classList.add('gasto', 'intro-final');
+      ensureIntroSrc();
+    };
+    if (dark) {
+      // 1) la luz ambiente se apaga poco a poco · 2) se encienden los faros
+      root.dataset.theme = 'dark'; root.classList.remove('lights'); themeUI(); swapIntro();
+      themeT = setTimeout(() => { if (isDark()) root.classList.add('lights'); }, reducedMotion ? 0 : 1050);
+    } else {
+      // 1) se apagan los faros · 2) vuelve la luz
+      root.classList.remove('lights');
+      themeT = setTimeout(() => { delete root.dataset.theme; themeUI(); swapIntro(); }, reducedMotion ? 0 : 380);
+    }
+  }
+  $('#themeBtn').addEventListener('click', () => setTheme(!isDark()));
+  themeUI();
+
   // ---------- Arranque: el coche "se abre" (doble parpadeo de intermitentes) ----------
   let booting = true;
   function finishBoot() {
@@ -384,18 +439,20 @@
     booting = false;
     hero.classList.remove('boot', 'blink');
     renderStatus();
+    if (isDark()) setTimeout(() => { if (isDark()) document.documentElement.classList.add('lights'); }, 250);
   }
   function bootSequence() {
     layoutMorph();
     if (reducedMotion) { finishBoot(); return; }
-    const imgs = [$('.car-img.reposo'), $('.car-img.lit')];
+    const dark = isDark();
+    const imgs = dark ? [$('.car-img.reposo-n.n-off'), $('.car-img.lit-n')] : [$('.car-img.reposo'), $('.car-img.lit')];
     const ready = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : Promise.resolve()));
     const start = () => {
       if (!booting || !hero.classList.contains('boot')) return;
       requestAnimationFrame(() => {
         hero.classList.remove('boot');                     // aparece el coche
         setTimeout(() => {
-          const lit = $('.car-img.lit');
+          const lit = dark ? $('.car-img.lit-n') : $('.car-img.lit');
           lit.addEventListener('animationend', finishBoot, { once: true });
           hero.classList.add('blink');                     // parpadeo × 2
           setTimeout(finishBoot, 2200);                    // por seguridad

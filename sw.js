@@ -1,6 +1,6 @@
-const VERSION = 'ev3-v6';
+const VERSION = 'ev3-v7';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/xlsx-lite.js', '/manifest.webmanifest',
-  '/ev3-reposo.jpg', '/ev3-cargando.jpg', '/icon-192.png', '/apple-touch-icon.png', '/favicon.png', '/gasto-final.jpg', '/ev3-intermitentes.jpg'];
+  '/ev3-reposo.jpg', '/ev3-cargando.jpg', '/icon-192.png', '/apple-touch-icon.png', '/favicon.png', '/gasto-final.jpg', '/ev3-intermitentes.jpg', '/ev3-noche.jpg', '/ev3-noche-off.jpg', '/ev3-noche-cargando.jpg', '/ev3-noche-cargando-off.jpg', '/ev3-intermitentes-noche.jpg', '/gasto-final-noche.jpg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

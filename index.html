@@ -18,9 +18,14 @@
   <link rel="preload" as="image" href="/ev3-reposo.jpg">
   <link rel="preload" as="image" href="/ev3-intermitentes.jpg">
   <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Aplica el tema guardado antes de pintar (sin parpadeo)
+    try { if (localStorage.getItem('ev3.theme') === '"dark"') { document.documentElement.dataset.theme = 'dark'; document.querySelector('meta[name=theme-color]').content = '#101215'; } } catch (e) {}
+  </script>
 </head>
 <body>
   <main class="app">
+    <div class="night-glow" aria-hidden="true"></div>
 
     <!-- Cabecera -->
     <header class="top">
@@ -28,9 +33,14 @@
         <h1>EV3</h1>
         <p class="status" id="status"><span class="dot"></span><span id="statusText">En reposo</span></p>
       </div>
-      <button class="icon-btn" id="liveBtn" aria-label="Iniciar carga">
-        <svg viewBox="0 0 24 24"><path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/></svg>
-      </button>
+      <div class="top-actions">
+        <button class="icon-btn" id="themeBtn" aria-label="Activar modo oscuro" aria-pressed="false">
+          <svg viewBox="0 0 24 24"><path d="M13.6 6.2c3.6 0 6.4 2.6 6.4 5.8s-2.8 5.8-6.4 5.8c-.9 0-1.6-2.6-1.6-5.8s.7-5.8 1.6-5.8zM9.6 7.6 3.8 9.4M9.6 11.1 3.8 12.9M9.6 14.6 3.8 16.4"/></svg>
+        </button>
+        <button class="icon-btn" id="liveBtn" aria-label="Iniciar carga">
+          <svg viewBox="0 0 24 24"><path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/></svg>
+        </button>
+      </div>
     </header>
 
     <!-- Hero: menú + coche -->
@@ -57,12 +67,16 @@
           <img class="car-img reposo" src="/ev3-reposo.jpg" alt="Kia EV3 en reposo" decoding="async">
           <img class="car-img cargando" src="/ev3-cargando.jpg" alt="Kia EV3 cargando" decoding="async">
           <img class="car-img lit" src="/ev3-intermitentes.jpg" alt="" aria-hidden="true" decoding="async">
+          <!-- Modo oscuro: coche de noche con luces apagadas (n-off) y encendidas (n-on) -->
+          <img class="car-img night n-off reposo-n" src="/ev3-noche-off.jpg" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-on reposo-n" src="/ev3-noche.jpg" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-off cargando-n" src="/ev3-noche-cargando-off.jpg" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night n-on cargando-n" src="/ev3-noche-cargando.jpg" alt="" aria-hidden="true" decoding="async">
+          <img class="car-img night lit-n" src="/ev3-intermitentes-noche.jpg" alt="" aria-hidden="true" decoding="async">
         </div>
-        <video class="car-intro" id="gastoVideo" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true">
-          <source src="/gasto-intro.mp4" type="video/mp4">
-          <source src="/gasto-intro.webm" type="video/webm">
-        </video>
-        <img class="car-intro car-intro-final" src="/gasto-final.jpg" alt="Kia EV3 con herramientas" decoding="async">
+        <video class="car-intro" id="gastoVideo" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback aria-hidden="true"></video>
+        <img class="car-intro car-intro-final day" src="/gasto-final.jpg" alt="Kia EV3 con herramientas" decoding="async">
+        <img class="car-intro car-intro-final night" src="/gasto-final-noche.jpg" alt="" aria-hidden="true" decoding="async">
       </div>
     </section>
 
