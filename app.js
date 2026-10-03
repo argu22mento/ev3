@@ -368,19 +368,14 @@
   // ---------- Coche + animación de «Otros gastos» (el coche no se mueve) ----------
   const hero = $('.hero'), carBox = $('#car');
   const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Coche dentro de la foto (fracciones): proporción del archivo, centro de la carrocería y largo
-  const STILL = { ar: 478 / 1024, cx: 0.535, cy: 0.4644, len: 0.794 };
-  // Coche en el último fotograma del vídeo original (px): centro y largo; de ahí salen ruedas y herramientas
-  const VCAR = { cx: 363, cy: 256, len: 486 };
-  const GI = {
-    'wheel-fl': { box: [226, 92, 42, 96], side: -1, din: 0.00, dout: 0.42 },
-    'wheel-fr': { box: [451, 92, 49, 96], side: 1, din: 0.07, dout: 0.36 },
-    'wheel-rl': { box: [226, 364, 42, 96], side: -1, din: 0.14, dout: 0.30 },
-    'wheel-rr': { box: [451, 364, 49, 96], side: 1, din: 0.21, dout: 0.24 },
-    toolbox: { box: [2, 240, 126, 100], zone: -1, v: -0.03, din: 0.42, dout: 0.14 },
-    ratchet: { box: [136, 240, 26, 98], zone: -1, v: 0.17, din: 0.52, dout: 0.10 },
-    jack: { box: [524, 378, 110, 74], zone: 1, v: 0.22, din: 0.58, dout: 0.06 },
-    gloves: { box: [511, 456, 86, 70], zone: 1, v: 0.38, din: 0.68, dout: 0.00 }
+  // Coche dentro del lienzo de las imágenes (fracciones del lienzo)
+  const STILL = { ar: 668 / 1284 };
+  // Ruedas de «Otros gastos»: centro y ancho en el lienzo; las de arriba entran por la derecha, las de abajo por la izquierda
+  const WHEELS = {
+    1: { cx: 0.872, cy: 0.090, w: 0.228, from: 1, din: 0.00, dout: 0.30 },
+    2: { cx: 0.850, cy: 0.201, w: 0.263, from: 1, din: 0.12, dout: 0.20 },
+    3: { cx: 0.143, cy: 0.800, w: 0.281, from: -1, din: 0.06, dout: 0.10 },
+    4: { cx: 0.130, cy: 0.904, w: 0.228, from: -1, din: 0.18, dout: 0.00 }
   };
   function stillFit(W, H) {
     let iw, ih; if (W / H > STILL.ar) { ih = H; iw = H * STILL.ar; } else { iw = W; ih = W / STILL.ar; }
@@ -389,41 +384,28 @@
   function layoutMorph() {
     const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
     const { iw, ih, ox: fox, oy: foy } = stillFit(W, H);
-    // --- ruedas y herramientas, a la escala exacta del coche ---
-    const L = STILL.len * ih, cx = fox + STILL.cx * iw, cy = foy + STILL.cy * ih, k = L / VCAR.len;
-    const wheelOut = 0.29 * L;                                  // las ruedas sobresalen ±0,28 del largo
-    const zoneL = [4, cx - wheelOut - 6], zoneR = [cx + wheelOut + 6, W - 4];
-    const zw = z => Math.max(20, z[1] - z[0]);
-    const kL = Math.min(k, zw(zoneL) * 0.94 / GI.toolbox.box[2]);
-    const kR = Math.min(k, zw(zoneR) * 0.94 / GI.jack.box[2]);
-    $$('.gi').forEach(el => {
-      const g = GI[el.dataset.k]; if (!g) return;
-      const [x, y, w, h] = g.box;
-      let left, top, ww, hh, off;
-      if (g.side) {                                             // rueda: posición real respecto al coche
-        ww = w * k; hh = h * k; left = cx + (x - VCAR.cx) * k; top = cy + (y - VCAR.cy) * k;
-        off = -g.side * ww * 0.95;                              // sale de debajo de la carrocería
-      } else {                                                  // herramienta: en el hueco libre a cada lado
-        const kk = g.zone < 0 ? kL : kR, z = g.zone < 0 ? zoneL : zoneR;
-        ww = w * kk; hh = h * kk; left = (z[0] + z[1]) / 2 - ww / 2; top = cy + g.v * L - hh / 2;
-        off = g.zone * 18;
-      }
-      Object.assign(el.style, { left: left + 'px', top: top + 'px', width: ww + 'px', height: hh + 'px' });
-      el.style.setProperty('--ox', off + 'px');
-      el.style.setProperty('--s0', g.side ? '1' : '.9');
+    // --- ruedas: giran sobre su propio eje mientras ruedan hasta su sitio ---
+    $$('.gi.wheel').forEach(el => {
+      const g = WHEELS[el.dataset.w]; if (!g) return;
+      const cx = fox + g.cx * iw, cy = foy + g.cy * ih, r = g.w * iw / 2;
+      const dist = g.from > 0 ? (W - (cx - r)) + 12 : (cx + r) + 12;     // empieza fuera del recuadro
+      const deg = (dist / r) * 57.3;                                      // vueltas reales al rodar
+      el.style.transformOrigin = `${cx}px ${cy}px`;
+      el.style.setProperty('--wx', (g.from * dist).toFixed(1) + 'px');
+      el.style.setProperty('--wr', (g.from * deg).toFixed(0) + 'deg');
       el.style.setProperty('--din', g.din + 's'); el.style.setProperty('--dout', g.dout + 's');
     });
     // --- posición de faros y pilotos en la página (luz proyectada en modo oscuro) ---
     const app = $('.app'), r = carBox.getBoundingClientRect(), ar = app.getBoundingClientRect();
     const ox = r.left - ar.left + fox, oy = r.top - ar.top + foy;
     const P = (fx, fy) => [ox + fx * iw, oy + fy * ih];
-    const [fx, fy] = P(0.53, 0.05), [lx] = P(0.23, 0.12), [rx] = P(0.83, 0.12), [bx, by] = P(0.52, 0.96);
+    const [fx, fy] = P(0.52, 0.12), [lx] = P(0.29, 0.17), [rx] = P(0.74, 0.17), [bx, by] = P(0.52, 0.86);
     const st = app.style;
     st.setProperty('--fx', fx + 'px'); st.setProperty('--fy', fy + 'px');
     st.setProperty('--lx', lx + 'px'); st.setProperty('--rx', rx + 'px');
-    st.setProperty('--fw', (iw * 1.25) + 'px'); st.setProperty('--fh', (ih * 0.34) + 'px');
+    st.setProperty('--fw', (iw * 1.1) + 'px'); st.setProperty('--fh', (ih * 0.26) + 'px');
     st.setProperty('--bx', bx + 'px'); st.setProperty('--by', by + 'px');
-    st.setProperty('--bw', (iw * 0.95) + 'px'); st.setProperty('--bh', (ih * 0.13) + 'px');
+    st.setProperty('--bw', (iw * 0.85) + 'px'); st.setProperty('--bh', (ih * 0.11) + 'px');
   }
   window.addEventListener('resize', layoutMorph);
 
@@ -477,14 +459,14 @@
     layoutMorph();
     if (reducedMotion) { finishBoot(); return; }
     const dark = isDark();
-    const imgs = dark ? [$('.car-img.reposo-n.n-off'), $('.car-img.lit-n')] : [$('.car-img.reposo'), $('.car-img.lit')];
+    const imgs = [$('.car-img.base'), $('.car-fx.blink')];
     const ready = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : Promise.resolve()));
     const start = () => {
       if (!booting || !hero.classList.contains('boot')) return;
       requestAnimationFrame(() => {
         hero.classList.remove('boot');                     // aparece el coche
         setTimeout(() => {
-          const lit = dark ? $('.car-img.lit-n') : $('.car-img.lit');
+          const lit = $('.car-fx.blink');
           lit.addEventListener('animationend', finishBoot, { once: true });
           hero.classList.add('blink');                     // parpadeo × 2
           setTimeout(finishBoot, 2200);                    // por seguridad

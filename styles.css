@@ -56,7 +56,7 @@ h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-
   display: grid;
   grid-template-columns: 56px 1fr;
   align-items: center;
-  height: min(52vh, 440px);
+  height: min(56vh, 480px);
   min-height: 320px;
   margin: 4px 0 8px;
 }
@@ -515,3 +515,33 @@ html[data-theme="dark"] .gi.tool { filter: none; }
 /* Hojas inferiores: arrastrar hacia abajo para cerrar */
 .sheet.dragging { transition: none !important; }
 .sheet .grabber { cursor: grab; padding-top: 0; }
+
+/* ================= v6 · nuevas imágenes del coche ================= */
+.car-fx { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; pointer-events: none; user-select: none; }
+.car-img.base, .car-img.charge, .gi.wheel { transition: opacity .8s var(--ease), filter 1.2s ease; }
+.car-img.charge { opacity: 0; }
+.charging .car-img.charge { opacity: 1; }
+.charging .car-img.base { opacity: 0; }
+/* Punto de carga: luz azul que "respira" mientras carga */
+.charging .car-fx.charge-light { animation: chargePulse 2.6s ease-in-out infinite; }
+@keyframes chargePulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+/* Intermitentes (arranque) */
+.hero.blink .car-fx.blink { animation: blink 1.5s linear both; }
+
+/* Modo oscuro: la luz ambiente baja sobre el coche y luego se encienden los faros */
+html[data-theme="dark"] .car-img.base, html[data-theme="dark"] .car-img.charge, html[data-theme="dark"] .gi.wheel {
+  filter: brightness(.48) saturate(.85) contrast(1.05);
+}
+html[data-theme="dark"] .car-fx { mix-blend-mode: screen; }
+.car-fx.head, .car-fx.tail { transition: opacity .45s ease; }
+html[data-theme="dark"].lights .car-fx.head { opacity: 1; animation: lightsOn 1.1s linear both; }
+html[data-theme="dark"].lights .car-fx.tail { opacity: .9; animation: lightsOnTail 1.3s ease both; }
+@keyframes lightsOnTail { 0% { opacity: 0; } 30% { opacity: .2; } 100% { opacity: .9; } }
+
+/* Ruedas de «Otros gastos»: entran rodando desde los lados y salen igual al revés */
+.gi.wheel {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0;
+  transform: translateX(var(--wx, 0px)) rotate(var(--wr, 0deg));
+  transition: transform .9s cubic-bezier(.22,.8,.25,1) var(--dout, 0s), opacity .35s ease var(--dout, 0s), filter 1.2s ease;
+}
+.hero.gasto .gi.wheel { opacity: 1; transform: none; transition-delay: var(--din, 0s), var(--din, 0s), 0s; }

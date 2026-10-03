@@ -1,8 +1,8 @@
-const VERSION = 'ev3-v8';
+const VERSION = 'ev3-v9';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/xlsx-lite.js', '/manifest.webmanifest',
-  '/ev3-reposo.webp', '/ev3-cargando.webp', '/ev3-intermitentes.webp',
-  '/ev3-noche.webp', '/ev3-noche-off.webp', '/ev3-noche-cargando.webp', '/ev3-noche-cargando-off.webp', '/ev3-intermitentes-noche.webp',
-  ...['wheel-fl', 'wheel-fr', 'wheel-rl', 'wheel-rr', 'toolbox', 'ratchet', 'jack', 'gloves'].flatMap(k => [`/gi-${k}.webp`, `/gi-${k}-n.webp`]),
+  '/ev3-car.webp', '/ev3-car-carga.webp', '/ev3-carga-luz.webp', '/ev3-intermitente.webp',
+  '/ev3-luces-delante.webp', '/ev3-luces-detras.webp',
+  '/ev3-rueda-1.webp', '/ev3-rueda-2.webp', '/ev3-rueda-3.webp', '/ev3-rueda-4.webp',
   '/icon-192.png', '/apple-touch-icon.png', '/favicon.png'];
 
 self.addEventListener('install', e => {
