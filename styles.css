@@ -545,3 +545,74 @@ html[data-theme="dark"].lights .car-fx.tail { opacity: .9; animation: lightsOnTa
   transition: transform .9s cubic-bezier(.22,.8,.25,1) var(--dout, 0s), opacity .35s ease var(--dout, 0s), filter 1.2s ease;
 }
 .hero.gasto .gi.wheel { opacity: 1; transform: none; transition-delay: var(--din, 0s), var(--din, 0s), 0s; }
+
+/* ================= v7 · coche único + carga rápida + animaciones ================= */
+.hero { height: min(50vh, 440px); min-height: 300px; }
+/* Mismo coche en todos los apartados: sin fotos alternativas */
+.charging .car-img.base { opacity: 1; }
+.car-img.base { opacity: 1; filter: drop-shadow(0 16px 18px rgba(0,0,0,.22)) drop-shadow(0 3px 4px rgba(0,0,0,.22)); }
+html[data-theme="dark"] .car-img.base { filter: drop-shadow(0 12px 22px rgba(0,0,0,.65)); }
+.car-fx.floor { opacity: 0; transition: opacity 1.2s ease; }
+html[data-theme="dark"] .car-fx.floor { opacity: .35; }
+/* Luz azul indirecta desde el suelo mientras carga (misma imagen del coche) */
+.under-wrap { position: absolute; inset: 0; opacity: 0; transition: opacity 1s ease; pointer-events: none; }
+.charging .under-wrap { opacity: 1; }
+.under-wrap .car-fx.under { opacity: 1; }
+.charging .car-fx.under { animation: underBreath 3.2s ease-in-out infinite; }
+@keyframes underBreath { 0%, 100% { opacity: .55; transform: scale(.985); } 50% { opacity: 1; transform: scale(1.01); } }
+html[data-theme="dark"] .under-wrap { mix-blend-mode: screen; }
+
+/* ---------- Acceso rápido de carga ---------- */
+.quick { margin: 0 0 14px; }
+.quick-tile {
+  width: 100%; display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--card); border-radius: 20px; padding: 12px 14px 12px 12px; box-shadow: var(--shadow);
+  transition: transform .25s var(--ease), background-color .5s ease, box-shadow .5s ease;
+}
+.quick-tile:active { transform: scale(.98); }
+.q-icon {
+  position: relative; flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+  background: var(--fill); transition: background-color .5s ease;
+}
+.q-icon svg { width: 22px; height: 22px; fill: none; stroke: var(--ink-3); stroke-width: 1.7; stroke-linejoin: round; transition: stroke .4s ease, fill .4s ease; }
+.q-ring { position: absolute; inset: -3px; border-radius: 17px; border: 2px solid #0A84FF; opacity: 0; pointer-events: none; }
+.q-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.q-text b { font-size: 16px; font-weight: 600; }
+.q-text span { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.q-switch { position: relative; width: 51px; height: 31px; flex: none; }
+.q-switch i { position: absolute; inset: 0; border-radius: 31px; background: rgba(120,120,128,.16); transition: background .3s; }
+.q-switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16); transition: transform .35s var(--ease); }
+.quick.on .q-switch i { background: #0A84FF; }
+.quick.on .q-switch i::after { transform: translateX(20px); }
+.quick.on .q-icon { background: rgba(10,132,255,.14); }
+.quick.on .q-icon svg { stroke: #0A84FF; fill: rgba(10,132,255,.25); }
+.quick.on .q-ring { animation: qRing 2.4s ease-out infinite; }
+@keyframes qRing { 0% { opacity: .55; transform: scale(.92); } 70%, 100% { opacity: 0; transform: scale(1.25); } }
+.quick.on .quick-tile { box-shadow: var(--shadow), 0 0 0 1px rgba(10,132,255,.22), 0 8px 26px rgba(10,132,255,.14); }
+.q-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  max-height: 0; opacity: 0; overflow: hidden; transform: translateY(-6px);
+  transition: max-height .5s var(--ease), opacity .35s ease, transform .5s var(--ease), margin .5s var(--ease);
+  margin: 0 4px;
+}
+.quick.on .q-stats { max-height: 70px; opacity: 1; transform: none; margin: 10px 4px 0; }
+.q-stats div { display: flex; flex-direction: column; gap: 1px; }
+.q-stats b { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.q-stats .label { font-size: 11px; }
+
+/* ---------- Toast con acción (Deshacer) ---------- */
+.toast { display: flex; align-items: center; gap: 14px; pointer-events: none; }
+.toast.show { pointer-events: auto; }
+.toast button { color: #64D2FF; font-weight: 600; font-size: 15px; }
+
+/* ---------- Animaciones de entrada con escalonado ---------- */
+.view.active { animation: none; }
+.view.active .stagger { animation: rise .55s var(--ease) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.list li.in { animation: rise .45s var(--ease) both; animation-delay: calc(var(--i, 0) * 35ms); }
+.chart .bar i { transition: height .7s var(--ease), opacity .2s; }
+.primary:active, .secondary:active, .chips button:active, .filter-chips button:active, .card.tip:active, .list li:active { transform: scale(.97); }
+.primary, .secondary, .chips button, .filter-chips button, .card.tip, .list li { transition: transform .2s var(--ease), background-color .3s, color .3s, opacity .2s; }
+.price-big span, .kpis b { display: inline-block; }
+.bump { animation: bump .45s var(--ease); }
+@keyframes bump { 40% { transform: scale(1.04); } }

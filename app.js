@@ -110,6 +110,10 @@
     const s = parseDT(date, start);
     let e = parseDT(date, end);
     if (e <= s) e = addDays(e, 1);
+    return calcRange(s, e, bono);
+  }
+  // Coste exacto entre dos instantes: cada hora se cobra solo por la fracción en la que se ha cargado
+  async function calcRange(s, e, bono = false) {
     const durMin = (e - s) / 60000;
     const k = bono ? BONO : 1;
     const slots = [];
@@ -133,9 +137,28 @@
 
   // ---------- UI helpers ----------
   let toastT;
-  function toast(msg) {
-    const el = $('#toast'); el.textContent = msg; el.classList.add('show');
-    clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2400);
+  function toast(msg, action, onAction, ms) {
+    const el = $('#toast'), act = $('#toastAct');
+    $('#toastMsg').textContent = msg;
+    act.hidden = !action; act.textContent = action || ''; act.onclick = null;
+    if (action) act.onclick = () => { el.classList.remove('show'); clearTimeout(toastT); onAction && onAction(); };
+    el.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms || (action ? 5500 : 2400));
+  }
+  // Animación de números (cuenta hasta el valor nuevo)
+  function setNum(el, value, fmt, prefix = '', suffix = '') {
+    if (!el) return;
+    const from = typeof el._v === 'number' ? el._v : value;
+    el._v = value;
+    if (reducedMotion || from === value || !isFinite(from) || !isFinite(value)) { el.textContent = prefix + fmt.format(value) + suffix; return; }
+    const t0 = performance.now(), d = 520;
+    cancelAnimationFrame(el._raf);
+    const step = t => {
+      const p = Math.min(1, (t - t0) / d), k = 1 - Math.pow(1 - p, 3);
+      el.textContent = prefix + fmt.format(from + (value - from) * k) + suffix;
+      if (p < 1) el._raf = requestAnimationFrame(step);
+    };
+    el._raf = requestAnimationFrame(step);
   }
   const tip = $('#tooltip');
   function showTip(html, x, y) { tip.innerHTML = html; tip.style.left = x + 'px'; tip.style.top = (y - 10) + 'px'; tip.classList.add('show'); }
@@ -352,7 +375,19 @@
   // ---------- Navegación ----------
   let view = 'inicio';
   const VIEWS = ['inicio', 'simulador', 'acumulado', 'gastos'];
+  function staggerList(ul) {
+    [...ul.children].forEach((li, i) => { if (i < 14) { li.style.setProperty('--i', i); li.classList.add('in'); } });
+  }
+  let staggerT = null;
+  function staggerView(sec) {
+    const items = [...sec.querySelectorAll(':scope > *, :scope > .swipe-pane > *, :scope > .sup-form > *')].filter(el => !el.classList.contains('swipe-pane') && el.offsetParent !== null);
+    $$('.stagger').forEach(el => el.classList.remove('stagger'));
+    items.forEach((el, i) => { el.style.setProperty('--i', Math.min(i, 8)); el.classList.add('stagger'); });
+    clearTimeout(staggerT);
+    staggerT = setTimeout(() => items.forEach(el => el.classList.remove('stagger')), 1200);
+  }
   function go(v) {
+    const changed = view !== v;
     view = v;
     $$('.rail-btn').forEach(b => b.classList.toggle('active', b.dataset.view === v));
     $$('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
@@ -362,21 +397,15 @@
     document.documentElement.classList.toggle('gasto-view', v === 'gastos');
     if (v === 'gastos') { renderGastos(); playIntro(); } else stopIntro();
     try { history.replaceState(null, '', v === 'inicio' ? location.pathname : '#' + v); } catch {}
+    if (changed || !go.done) { go.done = true; staggerView($('#view-' + v)); }
   }
   $$('.rail-btn').forEach(b => b.addEventListener('click', () => { go(b.dataset.view); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
 
   // ---------- Coche + animación de «Otros gastos» (el coche no se mueve) ----------
   const hero = $('.hero'), carBox = $('#car');
   const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Coche dentro del lienzo de las imágenes (fracciones del lienzo)
-  const STILL = { ar: 668 / 1284 };
-  // Ruedas de «Otros gastos»: centro y ancho en el lienzo; las de arriba entran por la derecha, las de abajo por la izquierda
-  const WHEELS = {
-    1: { cx: 0.872, cy: 0.090, w: 0.228, from: 1, din: 0.00, dout: 0.30 },
-    2: { cx: 0.850, cy: 0.201, w: 0.263, from: 1, din: 0.12, dout: 0.20 },
-    3: { cx: 0.143, cy: 0.800, w: 0.281, from: -1, din: 0.06, dout: 0.10 },
-    4: { cx: 0.130, cy: 0.904, w: 0.228, from: -1, din: 0.18, dout: 0.00 }
-  };
+  // Lienzo de las imágenes del coche (todas las capas comparten tamaño y encuadre)
+  const STILL = { ar: 494 / 920 };
   function stillFit(W, H) {
     let iw, ih; if (W / H > STILL.ar) { ih = H; iw = H * STILL.ar; } else { iw = W; ih = W / STILL.ar; }
     return { iw, ih, ox: (W - iw) / 2, oy: (H - ih) / 2 };
@@ -384,39 +413,23 @@
   function layoutMorph() {
     const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
     const { iw, ih, ox: fox, oy: foy } = stillFit(W, H);
-    // --- ruedas: giran sobre su propio eje mientras ruedan hasta su sitio ---
-    $$('.gi.wheel').forEach(el => {
-      const g = WHEELS[el.dataset.w]; if (!g) return;
-      const cx = fox + g.cx * iw, cy = foy + g.cy * ih, r = g.w * iw / 2;
-      const dist = g.from > 0 ? (W - (cx - r)) + 12 : (cx + r) + 12;     // empieza fuera del recuadro
-      const deg = (dist / r) * 57.3;                                      // vueltas reales al rodar
-      el.style.transformOrigin = `${cx}px ${cy}px`;
-      el.style.setProperty('--wx', (g.from * dist).toFixed(1) + 'px');
-      el.style.setProperty('--wr', (g.from * deg).toFixed(0) + 'deg');
-      el.style.setProperty('--din', g.din + 's'); el.style.setProperty('--dout', g.dout + 's');
-    });
     // --- posición de faros y pilotos en la página (luz proyectada en modo oscuro) ---
     const app = $('.app'), r = carBox.getBoundingClientRect(), ar = app.getBoundingClientRect();
     const ox = r.left - ar.left + fox, oy = r.top - ar.top + foy;
     const P = (fx, fy) => [ox + fx * iw, oy + fy * ih];
-    const [fx, fy] = P(0.52, 0.12), [lx] = P(0.29, 0.17), [rx] = P(0.74, 0.17), [bx, by] = P(0.52, 0.86);
+    const [fx, fy] = P(0.50, 0.17), [lx] = P(0.34, 0.22), [rx] = P(0.66, 0.22), [bx, by] = P(0.50, 0.92);
     const st = app.style;
     st.setProperty('--fx', fx + 'px'); st.setProperty('--fy', fy + 'px');
     st.setProperty('--lx', lx + 'px'); st.setProperty('--rx', rx + 'px');
-    st.setProperty('--fw', (iw * 1.1) + 'px'); st.setProperty('--fh', (ih * 0.26) + 'px');
+    st.setProperty('--fw', (iw * 1.05) + 'px'); st.setProperty('--fh', (ih * 0.24) + 'px');
     st.setProperty('--bx', bx + 'px'); st.setProperty('--by', by + 'px');
     st.setProperty('--bw', (iw * 0.85) + 'px'); st.setProperty('--bh', (ih * 0.11) + 'px');
   }
   window.addEventListener('resize', layoutMorph);
 
-  // Entrar en «Otros gastos»: salen las ruedas y aparecen las herramientas · salir: lo mismo al revés
-  function playIntro() {
-    layoutMorph();
-    if (hero.classList.contains('gasto')) return;
-    void carBox.offsetWidth;
-    hero.classList.add('gasto');
-  }
-  function stopIntro() { hero.classList.remove('gasto'); }
+  // El coche es el mismo en todos los apartados
+  function playIntro() { layoutMorph(); }
+  function stopIntro() {}
 
   // ---------- Modo oscuro (luces cortas) ----------
   const root = document.documentElement;
@@ -492,9 +505,9 @@
     const now = new Date();
     let charging = false, msg = 'En reposo';
     if (live) {
-      const s = new Date(live.start), min = Math.max(0, (now - s) / 60000);
+      const st0 = new Date(live.start), min = Math.max(0, (now - st0) / 60000);
       charging = true;
-      msg = `Cargando · desde ${hm(s)} · ${f1.format(Math.min(BATTERY, POWER * min / 60))} kWh`;
+      msg = `Cargando · desde las ${hm(st0)}`;
     } else {
       const a = activeCharge(now);
       if (a) { charging = true; msg = `Cargando · hasta ${hm(a.e)}`; }
@@ -505,21 +518,75 @@
     const btn = $('#liveBtn');
     btn.classList.toggle('on', !!live);
     btn.setAttribute('aria-label', live ? 'Detener carga' : 'Iniciar carga');
+    renderQuick();
   }
 
-  $('#liveBtn').addEventListener('click', async () => {
-    if (!live) {
-      const n = new Date(); n.setSeconds(0, 0);
-      live = { start: n.toISOString() }; store.set('ev3.live', live);
-      toast('Carga iniciada'); renderStatus();
-    } else {
-      if (!(await confirmBox('¿Detener la carga?', 'Podrás revisarla y registrarla en Recargas.', 'Detener', false))) return;
-      const s = new Date(live.start), e = new Date();
-      live = null; store.set('ev3.live', null); renderStatus();
-      simState = { date: ymd(s), start: hm(s), end: hm(e) };
-      go('simulador'); toast('Revisa y registra la carga');
+  // ---------- Acceso rápido: carga en directo ----------
+  const pad2 = n => String(n).padStart(2, '0');
+  let liveCost = null, liveCostAt = 0;
+  function clockTxt(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 3600)}:${pad2(Math.floor(s / 60) % 60)}:${pad2(s % 60)}`; }
+  function renderQuick() {
+    const q = $('#quick'), on = !!live;
+    q.classList.toggle('on', on);
+    $('#quickBtn').setAttribute('aria-checked', String(on));
+    if (!on) {
+      $('#qTitle').textContent = 'Carga en casa';
+      $('#qSub').textContent = 'Toca para empezar a registrar';
+      return;
     }
-  });
+    const s = new Date(live.start), now = new Date(), ms = now - s;
+    const kwh = Math.min(BATTERY, POWER * ms / 3600000);
+    $('#qTitle').textContent = 'Cargando';
+    $('#qSub').textContent = `Desde las ${hm(s)}${ymd(s) !== ymd(now) ? ' de ayer' : ''} · 3,7 kW${live.bono ? ' · bono social' : ''}`;
+    $('#qTime').textContent = clockTxt(ms);
+    $('#qKwh').textContent = `${f2.format(kwh)} kWh`;
+    $('#qKm').textContent = `+${f0.format(kmOf(kwh))} km`;
+    $('#qCost').textContent = liveCost == null ? '—' : `${f2.format(liveCost)} €`;
+    if (Date.now() - liveCostAt > 20000) {             // coste con los precios reales de cada hora
+      liveCostAt = Date.now();
+      calcRange(s, now, live.bono).then(r => { if (live) { liveCost = r.cost; $('#qCost').textContent = `${f2.format(r.cost)} €`; } }).catch(() => {});
+    }
+  }
+  let quickTick = null;
+  function ensureTick() {
+    clearInterval(quickTick);
+    if (live) quickTick = setInterval(renderQuick, 1000);
+  }
+  function startLive() {
+    live = { start: new Date().toISOString(), bono: !!bonoPref };
+    liveCost = 0; liveCostAt = 0;
+    store.set('ev3.live', live);
+    renderStatus(); ensureTick();
+    try { navigator.vibrate && navigator.vibrate(12); } catch {}
+    toast(`Carga iniciada a las ${hm(new Date(live.start))}`);
+  }
+  async function stopLive() {
+    if (!live) return;
+    const prev = live, s = new Date(prev.start), e = new Date();
+    live = null; store.set('ev3.live', null); liveCost = null;
+    renderStatus(); ensureTick();
+    try { navigator.vibrate && navigator.vibrate([8, 40, 8]); } catch {}
+    const mins = (e - s) / 60000;
+    if (mins < 1) { toast('Carga de menos de un minuto: no se ha guardado'); return; }
+    const r = await calcRange(s, e, prev.bono);
+    const rec = {
+      id: uid(), type: 'home', date: ymd(s), start: hm(s), end: hm(e),
+      startAt: s.toISOString(), endAt: e.toISOString(),
+      kwh: +r.kwh.toFixed(3), cost: +r.cost.toFixed(4), costFull: +r.costFull.toFixed(4),
+      bono: !!prev.bono, live: true, createdAt: new Date().toISOString()
+    };
+    if (r.missing) rec.missingHours = r.missing;
+    charges.push(rec); saveCharges(); refreshAll();
+    toast(`Guardada · ${durTxt(mins)} · ${f2.format(r.cost)} €${r.missing ? ' (faltan precios)' : ''}`, 'Deshacer', () => {
+      charges = charges.filter(c => c.id !== rec.id); saveCharges();
+      live = prev; store.set('ev3.live', live); liveCostAt = 0;
+      refreshAll(); renderStatus(); ensureTick(); toast('Carga reanudada');
+    });
+  }
+  const toggleLive = () => (live ? stopLive() : startLive());
+  $('#quickBtn').addEventListener('click', toggleLive);
+  $('#liveBtn').addEventListener('click', toggleLive);
+  ensureTick();
 
   // ---------- INICIO ----------
   let dayIdx = 0, selHour = null, lastDay = null, dayData = null;
@@ -573,6 +640,7 @@
       bar.addEventListener('click', ev => { ev.stopPropagation(); hideTip(); selHour = h; updateSel(); openPriceSheet(h); });
       chart.appendChild(bar);
       requestAnimationFrame(() => requestAnimationFrame(() => {
+        bar.firstChild.style.transitionDelay = (h * 14) + 'ms';   // las barras crecen en cascada
         bar.firstChild.style.height = p == null ? '4%' : `${Math.max(6, (p / max) * 100)}%`;
       }));
     });
@@ -582,7 +650,7 @@
       [...chart.children].forEach((b, i) => b.classList.toggle('sel', i === selHour));
       const p = hours[selHour], l = lv(p);
       $('#priceLabel').textContent = selHour === nowH ? 'Precio ahora' : `Precio a las ${pad(selHour)}:00${dayIdx ? ' · mañana' : ''}`;
-      $('#priceValue').textContent = p == null ? '—' : f4.format(p);
+      if (p == null) { $('#priceValue').textContent = '—'; $('#priceValue')._v = undefined; } else setNum($('#priceValue'), p, f4);
       const b = $('#priceBadge'); b.className = `badge ${l}`; b.textContent = LV_TXT[l];
       $('#priceHour').textContent = `${pad(selHour)}:00 – ${pad((selHour + 1) % 24)}:00` + (p == null ? '' : ` · ${f2.format(p * POWER * (bonoPref ? BONO : 1))} € por hora de carga${bonoPref ? ' (bono social)' : ''}`);
     }
@@ -669,9 +737,9 @@
     if (seq !== simSeq) return;
     simResult = { date, start, end, bono, ...r };
 
-    $('#simKm').textContent = '+' + f0.format(kmOf(r.kwh));
+    setNum($('#simKm'), kmOf(r.kwh), f0, '+');
     $('#simKwhNote').textContent = `km · ${f2.format(r.kwh)} kWh`;
-    $('#simCost').textContent = r.missing === r.slots.length ? '—' : f2.format(r.cost);
+    if (r.missing === r.slots.length) $('#simCost').textContent = '—'; else setNum($('#simCost'), r.cost, f2);
     $('#simCostNote').textContent = bono && !r.missing ? `€ · sin bono ${f2.format(r.costFull)} €` : '€';
     $('#simDur').textContent = durTxt(r.durMin);
     $('#simAvg').textContent = r.missing ? '—' : `${f4.format(r.avg)} €`;
@@ -749,6 +817,7 @@
     const tot = list.filter(c => c.date.startsWith(year)).reduce((a, c) => a + c.cost, 0);
     $('#gTotal').textContent = list.length ? `${year}: ${f2.format(tot)} €` : '';
     $('#gList').innerHTML = list.length ? list.slice(0, 30).map(itemHtml).join('') : `<li class="empty">Aún no hay gastos</li>`;
+    staggerList($('#gList'));
   }
   function updateGasto() {
     const a = num($('#gAmount').value);
@@ -815,7 +884,8 @@
   function itemHtml(c) {
     let sub = '', right2 = '';
     if (c.type === 'home') {
-      const s = parseDT(c.date, c.start); let e = parseDT(c.date, c.end); if (e <= s) e = addDays(e, 1);
+      let s = parseDT(c.date, c.start), e = parseDT(c.date, c.end); if (e <= s) e = addDays(e, 1);
+      if (c.startAt && c.endAt) { s = new Date(c.startAt); e = new Date(c.endAt); }
       sub = `${c.start} – ${c.end} · ${durTxt((e - s) / 60000)}${c.bono ? ' · <span class="tag">Bono social</span>' : ''}`;
       right2 = `+${f0.format(kmOf(c.kwh))} km`;
     } else if (c.type === 'super') {
@@ -844,9 +914,9 @@
     const kwh = energy.reduce((a, c) => a + c.kwh, 0);
     const eCost = energy.reduce((a, c) => a + c.cost, 0);
     const cost = list.reduce((a, c) => a + c.cost, 0);
-    $('#accCost').textContent = f2.format(cost);
+    setNum($('#accCost'), cost, f2);
     const km = kmOf(kwh);
-    $('#accKm').textContent = f0.format(km);
+    setNum($('#accKm'), km, f0);
     $('#accKwh').textContent = kwh ? `${f1.format(kwh)} kWh` : '—';
     $('#accN').textContent = list.length;
     $('#accPer100').textContent = km ? `${f2.format(eCost / km * 100)} €` : '—';
@@ -863,6 +933,7 @@
     $('#listTitle').textContent = names.length ? `Movimientos · ${names.join(', ')}` : 'Movimientos';
     const ul = $('#accList');
     ul.innerHTML = list.length ? list.map(itemHtml).join('') : `<li class="empty">No hay movimientos en este periodo</li>`;
+    staggerList(ul);
   }
 
   setupSeg($('[data-seg="period"]'), v => { period = v; offset = 0; renderAcc(); }, $('#panePeriod'));
@@ -946,6 +1017,7 @@
     if (c.type === 'home') {
       if (!$('#edStart').value || !$('#edEnd').value || isNaN(kwh)) { toast('Revisa los datos'); return; }
       Object.assign(c, { start: $('#edStart').value, end: $('#edEnd').value, kwh, bono: $('#edBono').checked });
+      { const s = parseDT(c.date, c.start); let e = parseDT(c.date, c.end); if (e <= s) e = addDays(e, 1); c.startAt = s.toISOString(); c.endAt = e.toISOString(); }
       c.costFull = c.bono ? +(c.cost / BONO).toFixed(4) : c.cost;
     } else if (c.type === 'super') {
       if (isNaN(kwh)) { toast('Revisa los datos'); return; }

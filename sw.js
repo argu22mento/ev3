@@ -1,8 +1,6 @@
-const VERSION = 'ev3-v9';
+const VERSION = 'ev3-v10';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/xlsx-lite.js', '/manifest.webmanifest',
-  '/ev3-car.webp', '/ev3-car-carga.webp', '/ev3-carga-luz.webp', '/ev3-intermitente.webp',
-  '/ev3-luces-delante.webp', '/ev3-luces-detras.webp',
-  '/ev3-rueda-1.webp', '/ev3-rueda-2.webp', '/ev3-rueda-3.webp', '/ev3-rueda-4.webp',
+  '/ev3-negro.webp', '/ev3n-faros.webp', '/ev3n-pilotos.webp', '/ev3n-intermitentes.webp', '/ev3n-carga.webp', '/ev3n-suelo.webp',
   '/icon-192.png', '/apple-touch-icon.png', '/favicon.png'];
 
 self.addEventListener('install', e => {

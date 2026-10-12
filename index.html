@@ -15,8 +15,8 @@
   <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <link rel="preload" as="image" href="/ev3-car.webp">
-  <link rel="preload" as="image" href="/ev3-intermitente.webp">
+  <link rel="preload" as="image" href="/ev3-negro.webp">
+  <link rel="preload" as="image" href="/ev3n-intermitentes.webp">
   <link rel="stylesheet" href="/styles.css">
   <script>
     // Aplica el tema guardado antes de pintar (sin parpadeo)
@@ -63,22 +63,35 @@
         </button>
       </nav>
       <div class="car" id="car">
-        <!-- Otros gastos: las ruedas entran rodando (el coche no se mueve) -->
-        <div class="gi-layer" aria-hidden="true">
-          <img class="gi wheel" data-w="1" src="/ev3-rueda-1.webp" alt="" decoding="async">
-          <img class="gi wheel" data-w="2" src="/ev3-rueda-2.webp" alt="" decoding="async">
-          <img class="gi wheel" data-w="3" src="/ev3-rueda-3.webp" alt="" decoding="async">
-          <img class="gi wheel" data-w="4" src="/ev3-rueda-4.webp" alt="" decoding="async">
-        </div>
         <div class="car-static">
-          <img class="car-img base" src="/ev3-car.webp" alt="Kia EV3" decoding="async">
-          <img class="car-img charge" src="/ev3-car-carga.webp" alt="Kia EV3 cargando" decoding="async">
-          <!-- Capas de luz -->
-          <img class="car-fx charge-light" src="/ev3-carga-luz.webp" alt="" aria-hidden="true" decoding="async">
-          <img class="car-fx tail" src="/ev3-luces-detras.webp" alt="" aria-hidden="true" decoding="async">
-          <img class="car-fx head" src="/ev3-luces-delante.webp" alt="" aria-hidden="true" decoding="async">
-          <img class="car-fx blink" src="/ev3-intermitente.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-fx floor" src="/ev3n-suelo.webp" alt="" aria-hidden="true" decoding="async">
+          <div class="under-wrap" aria-hidden="true"><img class="car-fx under" src="/ev3n-carga.webp" alt="" decoding="async"></div>
+          <img class="car-img base" src="/ev3-negro.webp" alt="Kia EV3" decoding="async">
+          <img class="car-fx tail" src="/ev3n-pilotos.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-fx head" src="/ev3n-faros.webp" alt="" aria-hidden="true" decoding="async">
+          <img class="car-fx blink" src="/ev3n-intermitentes.webp" alt="" aria-hidden="true" decoding="async">
         </div>
+      </div>
+    </section>
+
+    <!-- Acceso rápido: carga en casa en tiempo real (visible en todos los apartados) -->
+    <section class="quick" id="quick">
+      <button class="quick-tile" id="quickBtn" role="switch" aria-checked="false">
+        <span class="q-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg>
+          <span class="q-ring"></span>
+        </span>
+        <span class="q-text">
+          <b id="qTitle">Carga en casa</b>
+          <span id="qSub">Toca para empezar a registrar</span>
+        </span>
+        <span class="q-switch" aria-hidden="true"><i></i></span>
+      </button>
+      <div class="q-stats" id="qStats" aria-live="polite">
+        <div><span class="label">Tiempo</span><b id="qTime">0:00:00</b></div>
+        <div><span class="label">Energía</span><b id="qKwh">0,00 kWh</b></div>
+        <div><span class="label">Autonomía</span><b id="qKm">+0 km</b></div>
+        <div><span class="label">Coste</span><b id="qCost">0,00 €</b></div>
       </div>
     </section>
 
@@ -335,7 +348,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast"><span id="toastMsg"></span><button id="toastAct" hidden></button></div>
   <div class="tooltip" id="tooltip"></div>
 
   <script src="/xlsx-lite.js" defer></script>
