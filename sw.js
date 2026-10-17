@@ -1,6 +1,6 @@
-const VERSION = 'ev3-v10';
+const VERSION = 'ev3-v11';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/xlsx-lite.js', '/manifest.webmanifest',
-  '/ev3-negro.webp', '/ev3n-faros.webp', '/ev3n-pilotos.webp', '/ev3n-intermitentes.webp', '/ev3n-carga.webp', '/ev3n-suelo.webp',
+  '/bg-normal.jpg', '/bg-carga.jpg', '/bg-intermitentes.jpg',
   '/icon-192.png', '/apple-touch-icon.png', '/favicon.png'];
 
 self.addEventListener('install', e => {

@@ -404,26 +404,19 @@
   // ---------- Coche + animación de «Otros gastos» (el coche no se mueve) ----------
   const hero = $('.hero'), carBox = $('#car');
   const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Lienzo de las imágenes del coche (todas las capas comparten tamaño y encuadre)
-  const STILL = { ar: 494 / 920 };
-  function stillFit(W, H) {
-    let iw, ih; if (W / H > STILL.ar) { ih = H; iw = H * STILL.ar; } else { iw = W; ih = W / STILL.ar; }
-    return { iw, ih, ox: (W - iw) / 2, oy: (H - ih) / 2 };
-  }
+  // La foto (784×1368) ocupa todo el ancho; el coche está a la derecha entre el 26 % y el 79 % de su altura
+  const STAGE = { ar: 1368 / 784, carTop: 0.255, carBottom: 0.80, menuTop: 0.205, menuBottom: 0.455 };
   function layoutMorph() {
-    const W = carBox.clientWidth, H = carBox.clientHeight; if (!W || !H) return;
-    const { iw, ih, ox: fox, oy: foy } = stillFit(W, H);
-    // --- posición de faros y pilotos en la página (luz proyectada en modo oscuro) ---
-    const app = $('.app'), r = carBox.getBoundingClientRect(), ar = app.getBoundingClientRect();
-    const ox = r.left - ar.left + fox, oy = r.top - ar.top + foy;
-    const P = (fx, fy) => [ox + fx * iw, oy + fy * ih];
-    const [fx, fy] = P(0.50, 0.17), [lx] = P(0.34, 0.22), [rx] = P(0.66, 0.22), [bx, by] = P(0.50, 0.92);
-    const st = app.style;
-    st.setProperty('--fx', fx + 'px'); st.setProperty('--fy', fy + 'px');
-    st.setProperty('--lx', lx + 'px'); st.setProperty('--rx', rx + 'px');
-    st.setProperty('--fw', (iw * 1.05) + 'px'); st.setProperty('--fh', (ih * 0.24) + 'px');
-    st.setProperty('--bx', bx + 'px'); st.setProperty('--by', by + 'px');
-    st.setProperty('--bw', (iw * 0.85) + 'px'); st.setProperty('--bh', (ih * 0.11) + 'px');
+    const app = $('.app'), W = app.clientWidth; if (!W) return;
+    const H = W * STAGE.ar;
+    app.style.setProperty('--stageH', H + 'px');
+    // el contenido empieza justo debajo del coche
+    const space = $('.car-space'), top = space.getBoundingClientRect().top - app.getBoundingClientRect().top;
+    space.style.height = Math.max(0, H * STAGE.carBottom - top) + 'px';
+    // menú flotante: centrado en la pared, a la izquierda del coche y por encima del cable de carga
+    const rail = $('.rail'), rh = rail.offsetHeight;
+    const y0 = H * STAGE.menuTop, y1 = H * STAGE.menuBottom;
+    rail.style.top = Math.max(y0, (y0 + y1) / 2 - rh / 2) + 'px';
   }
   window.addEventListener('resize', layoutMorph);
 
@@ -431,33 +424,9 @@
   function playIntro() { layoutMorph(); }
   function stopIntro() {}
 
-  // ---------- Modo oscuro (luces cortas) ----------
+  // Solo modo claro
   const root = document.documentElement;
-  function isDark() { return root.dataset.theme === 'dark'; }
-  let themeT = null, themeAnimT = null;
-  function themeUI() {
-    const d = isDark(), b = $('#themeBtn');
-    b.classList.toggle('on', d); b.setAttribute('aria-pressed', String(d));
-    b.setAttribute('aria-label', d ? 'Desactivar modo oscuro' : 'Activar modo oscuro');
-    const m = $('meta[name=theme-color]'); if (m) m.content = d ? '#101215' : '#F2F0EF';
-  }
-  function setTheme(dark) {
-    clearTimeout(themeT); clearTimeout(themeAnimT);
-    root.classList.add('theme-anim');
-    themeAnimT = setTimeout(() => root.classList.remove('theme-anim'), 1700);
-    store.set('ev3.theme', dark ? 'dark' : 'light');
-    if (dark) {
-      // 1) la luz ambiente se apaga poco a poco · 2) se encienden los faros
-      root.dataset.theme = 'dark'; root.classList.remove('lights'); themeUI();
-      themeT = setTimeout(() => { if (isDark()) root.classList.add('lights'); }, reducedMotion ? 0 : 1050);
-    } else {
-      // 1) se apagan los faros · 2) vuelve la luz
-      root.classList.remove('lights');
-      themeT = setTimeout(() => { delete root.dataset.theme; themeUI(); }, reducedMotion ? 0 : 380);
-    }
-  }
-  $('#themeBtn').addEventListener('click', () => setTheme(!isDark()));
-  themeUI();
+  function isDark() { return false; }
 
   // ---------- Arranque: el coche "se abre" (doble parpadeo de intermitentes) ----------
   let booting = true;
@@ -466,20 +435,25 @@
     booting = false;
     hero.classList.remove('boot', 'blink');
     renderStatus();
-    if (isDark()) setTimeout(() => { if (isDark()) document.documentElement.classList.add('lights'); }, 250);
+  }
+  // Confirmación visual: doble parpadeo rápido de los intermitentes al guardar
+  function blinkOK() {
+    if (reducedMotion || booting) return;
+    hero.classList.remove('blink-ok'); void hero.offsetWidth; hero.classList.add('blink-ok');
+    setTimeout(() => hero.classList.remove('blink-ok'), 1000);
   }
   function bootSequence() {
     layoutMorph();
     if (reducedMotion) { finishBoot(); return; }
     const dark = isDark();
-    const imgs = [$('.car-img.base'), $('.car-fx.blink')];
+    const imgs = [$('.bg-normal'), $('.bg-blink')];
     const ready = Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : Promise.resolve()));
     const start = () => {
       if (!booting || !hero.classList.contains('boot')) return;
       requestAnimationFrame(() => {
         hero.classList.remove('boot');                     // aparece el coche
         setTimeout(() => {
-          const lit = $('.car-fx.blink');
+          const lit = $('.bg-blink');
           lit.addEventListener('animationend', finishBoot, { once: true });
           hero.classList.add('blink');                     // parpadeo × 2
           setTimeout(finishBoot, 2200);                    // por seguridad
@@ -530,8 +504,9 @@
     q.classList.toggle('on', on);
     $('#quickBtn').setAttribute('aria-checked', String(on));
     if (!on) {
-      $('#qTitle').textContent = 'Carga en casa';
-      $('#qSub').textContent = 'Toca para empezar a registrar';
+      const sch = activeCharge();
+      $('#qTitle').textContent = sch ? 'Carga programada' : 'Carga en casa';
+      $('#qSub').textContent = sch ? `En curso hasta las ${hm(sch.e)}` : 'Toca para registrar una carga';
       return;
     }
     const s = new Date(live.start), now = new Date(), ms = now - s;
@@ -542,6 +517,9 @@
     $('#qKwh').textContent = `${f2.format(kwh)} kWh`;
     $('#qKm').textContent = `+${f0.format(kmOf(kwh))} km`;
     $('#qCost').textContent = liveCost == null ? '—' : `${f2.format(liveCost)} €`;
+    const pct = Math.min(100, kwh / BATTERY * 100);
+    $('#qBar').style.width = Math.max(1.5, pct) + '%';
+    $('#qPct').textContent = `+${f1.format(pct)} % de batería · carga completa en ${durTxt(Math.max(0, (BATTERY - kwh) / POWER * 60))}`;
     if (Date.now() - liveCostAt > 20000) {             // coste con los precios reales de cada hora
       liveCostAt = Date.now();
       calcRange(s, now, live.bono).then(r => { if (live) { liveCost = r.cost; $('#qCost').textContent = `${f2.format(r.cost)} €`; } }).catch(() => {});
@@ -576,7 +554,7 @@
       bono: !!prev.bono, live: true, createdAt: new Date().toISOString()
     };
     if (r.missing) rec.missingHours = r.missing;
-    charges.push(rec); saveCharges(); refreshAll();
+    charges.push(rec); saveCharges(); refreshAll(); blinkOK();
     toast(`Guardada · ${durTxt(mins)} · ${f2.format(r.cost)} €${r.missing ? ' (faltan precios)' : ''}`, 'Deshacer', () => {
       charges = charges.filter(c => c.id !== rec.id); saveCharges();
       live = prev; store.set('ev3.live', live); liveCostAt = 0;
@@ -770,7 +748,7 @@
     const { date, start, end, kwh, cost, costFull, bono } = simResult;
     charges.push({ id: uid(), type: 'home', date, start, end, kwh: +kwh.toFixed(3), cost: +cost.toFixed(4), costFull: +costFull.toFixed(4), bono, createdAt: new Date().toISOString() });
     saveCharges(); renderStatus();
-    toast(`Carga registrada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €${bono ? ' (bono)' : ''}`);
+    toast(`Carga registrada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €${bono ? ' (bono)' : ''}`); blinkOK();
   });
 
   // ---------- RECARGAS: supercarga ----------
@@ -794,7 +772,7 @@
     saveCharges();
     $('#supKwh').value = ''; $('#supCost').value = ''; $('#supPlace').value = '';
     updateSuper(); toggleSuper(false);
-    toast(`Supercarga guardada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €`);
+    toast(`Supercarga guardada · +${f0.format(kmOf(kwh))} km · ${f2.format(cost)} €`); blinkOK();
   });
   function toggleSuper(open) {
     $('#supForm').hidden = !open; $('#supOpen').hidden = open;
@@ -847,7 +825,7 @@
     charges.push(rec); saveCharges();
     $('#gAmount').value = ''; $('#gConcept').value = ''; gPending = null; showGFile();
     renderGastos();
-    toast(attachFailed ? 'Gasto guardado, pero no se pudo guardar el adjunto' : `Gasto añadido · ${f2.format(a)} €${rec.attachment ? ' · con adjunto' : ''}`);
+    toast(attachFailed ? 'Gasto guardado, pero no se pudo guardar el adjunto' : `Gasto añadido · ${f2.format(a)} €${rec.attachment ? ' · con adjunto' : ''}`); blinkOK();
   });
   $('#gList').addEventListener('click', e => { const li = e.target.closest('li[data-id]'); if (li) openEdit(li.dataset.id); });
 
@@ -903,6 +881,38 @@
     </li>`;
   }
 
+  // ---------- Comparador EV3 vs combustión ----------
+  const cmpPref = store.get('ev3.cmp', { l: 7, p: 1.8 });
+  $('#cmpL').value = f1.format(cmpPref.l).replace(/,0$/, '');
+  $('#cmpP').value = f2.format(cmpPref.p);
+  let cmpData = [];
+  function renderCompare(energy) {
+    if (energy) cmpData = energy;
+    const kwh = cmpData.reduce((a, c) => a + c.kwh, 0), ev = cmpData.reduce((a, c) => a + c.cost, 0), km = kmOf(kwh);
+    const L = num($('#cmpL').value), P = num($('#cmpP').value);
+    const ok = km > 0 && L > 0 && P > 0;
+    $('#cmpEmpty').hidden = km > 0;
+    $('#cmpCard').classList.toggle('empty', !km);
+    $('#cmpKm').textContent = km ? `${f0.format(km)} km` : '';
+    if (!ok) {
+      $('#cmpBarFuel').style.width = '0%'; $('#cmpBarEv').style.width = '0%';
+      $('#cmpFuel').textContent = '—'; $('#cmpEv').textContent = km ? `${f2.format(ev)} €` : '—';
+      $('#cmpSave').textContent = '—'; $('#cmpPct').textContent = ''; return;
+    }
+    const fuel = km / 100 * L * P, save = fuel - ev, max = Math.max(fuel, ev, 0.01);
+    $('#cmpBarFuel').style.width = (fuel / max * 100) + '%';
+    $('#cmpBarEv').style.width = Math.max(1.5, ev / max * 100) + '%';
+    setNum($('#cmpFuel'), fuel, f2, '', ' €'); setNum($('#cmpEv'), ev, f2, '', ' €');
+    setNum($('#cmpSave'), Math.abs(save), f2, save >= 0 ? '' : '−', ' €');
+    $('#cmpSaveBox').classList.toggle('neg', save < 0);
+    $('#cmpPct').textContent = fuel > 0 ? (save >= 0 ? `${f0.format(save / fuel * 100)} % menos que con combustión` : 'Más caro que con combustión') : '';
+  }
+  ['#cmpL', '#cmpP'].forEach(sel => $(sel).addEventListener('input', () => {
+    const L = num($('#cmpL').value), P = num($('#cmpP').value);
+    if (L > 0 && P > 0) store.set('ev3.cmp', { l: L, p: P });
+    renderCompare();
+  }));
+
   function renderAcc() {
     const { from, to, label } = periodRange();
     $('#periodLabel').textContent = label;
@@ -919,6 +929,7 @@
     setNum($('#accKm'), km, f0);
     $('#accKwh').textContent = kwh ? `${f1.format(kwh)} kWh` : '—';
     $('#accN').textContent = list.length;
+    renderCompare(inPeriod.filter(c => c.type !== 'gasto'));
     $('#accPer100').textContent = km ? `${f2.format(eCost / km * 100)} €` : '—';
 
     const parts = ['home', 'super', 'gasto'].filter(t => !typeFilter.size || typeFilter.has(t))
