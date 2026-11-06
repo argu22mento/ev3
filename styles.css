@@ -716,3 +716,40 @@ h1 { color: #1D1D1F; }
 .cmp-save.neg span, .cmp-save.neg b, .cmp-save.neg small { color: #D70015; }
 .cmp.empty .cmp-bars, .cmp.empty .cmp-save { opacity: .35; }
 .cmp-empty { font-size: 13px; color: var(--ink-2); margin: 12px 0 0; text-align: center; }
+
+/* ================= v9 · bono 42,5 % + aviso inicial de precios ================= */
+.bono-tag {
+  display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: #248A3D; background: rgba(52,199,89,.13);
+}
+.bono-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #34C759; }
+
+.welcome {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px 16px calc(env(safe-area-inset-bottom) + 20px);
+  background: rgba(233,236,240,0); -webkit-backdrop-filter: blur(0px); backdrop-filter: blur(0px);
+  transition: background-color .4s ease, backdrop-filter .45s ease, -webkit-backdrop-filter .45s ease;
+}
+.welcome[hidden] { display: none; }
+.welcome.show { background: rgba(233,236,240,.35); -webkit-backdrop-filter: blur(22px) saturate(1.25); backdrop-filter: blur(22px) saturate(1.25); }
+.w-card {
+  width: 100%; max-width: 420px; background: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.8);
+  border-radius: 28px; padding: 18px 18px 16px; box-shadow: 0 20px 60px rgba(30,40,60,.18), 0 2px 6px rgba(0,0,0,.05);
+  opacity: 0; transform: translateY(24px) scale(.97); transition: opacity .35s ease, transform .5s cubic-bezier(.2,.9,.25,1.05);
+}
+.welcome.show .w-card { opacity: 1; transform: none; }
+.welcome.hide .w-card { opacity: 0; transform: translateY(10px) scale(.96); transition-duration: .25s, .3s; }
+.w-head { display: flex; align-items: center; justify-content: space-between; }
+.w-head .close { position: static; transform: none; }
+.w-eyebrow { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+.w-eyebrow::first-letter { text-transform: uppercase; }
+.w-price { display: flex; align-items: baseline; gap: 6px; margin: 10px 0 0; font-weight: 700; }
+.w-price b { font-size: 44px; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.w-price small { font-size: 17px; color: var(--ink-2); font-weight: 500; }
+.w-price .badge { margin-left: auto; align-self: center; }
+.w-sub { font-size: 14px; color: var(--ink-2); margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.w-chart { height: 140px; margin-top: 16px; cursor: pointer; }
+.w-best { margin-top: 14px; padding: 12px 14px; border-radius: 16px; background: rgba(10,132,255,.08); display: grid; gap: 2px; }
+.w-best span { font-size: 12px; color: #0A63C9; font-weight: 600; }
+.w-best b { font-size: 20px; letter-spacing: -.01em; }
+.w-best small { font-size: 12px; color: var(--ink-2); }
+.w-card .primary { margin-top: 14px; }

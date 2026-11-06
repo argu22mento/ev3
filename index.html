@@ -100,6 +100,7 @@
         </div>
         <div class="price-big"><span id="priceValue">—</span><small>€/kWh</small></div>
         <p class="muted" id="priceHour">Cargando precios…</p>
+        <p class="bono-tag" id="priceBono" hidden>Con bono social · −42,5 %</p>
       </article>
 
       <article class="card chart-card" id="chartCard">
@@ -132,7 +133,7 @@
         <label class="row"><span>Inicio</span><input type="time" id="simStart" step="900" value="00:00"></label>
         <label class="row"><span>Fin</span><input type="time" id="simEnd" step="900" value="07:00"></label>
         <div class="row">
-          <span>Bono social <small class="row-note">−50 % por kWh</small></span>
+          <span>Bono social <small class="row-note">−42,5 % por kWh</small></span>
           <label class="switch"><input type="checkbox" id="simBono"><i></i></label>
         </div>
         <div class="chips" id="simChips">
@@ -331,7 +332,7 @@
       </label>
       <label class="row" data-for="gasto"><span>Concepto</span><input type="text" id="edConcept" autocomplete="off"></label>
       <div class="row" data-for="gasto"><span>Adjunto</span><span class="attach" id="edAttach"></span></div>
-      <div class="row" data-for="home"><span>Bono social <small class="row-note">−50 %</small></span><label class="switch"><input type="checkbox" id="edBono"><i></i></label></div>
+      <div class="row" data-for="home"><span>Bono social <small class="row-note">−42,5 %</small></span><label class="switch"><input type="checkbox" id="edBono"><i></i></label></div>
       <label class="row" data-for="home super"><span>Energía (kWh) <small class="row-note" id="edKmNote"></small></span><input type="text" id="edKwh" inputmode="decimal"></label>
       <label class="row"><span id="edCostLabel">Coste (€)</span><input type="text" id="edCost" inputmode="decimal"></label>
     </div>
@@ -349,6 +350,24 @@
         <button id="alertCancel">Cancelar</button>
         <button id="alertOk" class="destructive">Eliminar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Aviso inicial: precio de la luz por horas (con bono social) -->
+  <div class="welcome" id="welcome" role="dialog" aria-modal="true" aria-labelledby="wTitle" hidden>
+    <div class="w-card">
+      <div class="w-head">
+        <span class="w-eyebrow" id="wDay">Precio de la luz · hoy</span>
+        <button class="close" id="wClose" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>
+      <h2 class="w-price" id="wTitle"><b id="wNow">—</b><small>€/kWh</small><span class="badge" id="wBadge">—</span></h2>
+      <p class="w-sub" id="wSub">Cargando precios…</p>
+      <p class="bono-tag" id="wBono" hidden>Con bono social · −42,5 %</p>
+      <div class="chart w-chart" id="wChart" aria-label="Precio por hora de hoy"></div>
+      <div class="chart-axis"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
+      <div class="stats" id="wStats"></div>
+      <div class="w-best" id="wBest" hidden></div>
+      <button class="primary" id="wGo">Entrar</button>
     </div>
   </div>
 

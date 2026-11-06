@@ -6,7 +6,8 @@
   const POWER = 3.7;          // kW
   const BATTERY = 84.1;       // kWh
   const CONSUMPTION = 18;     // kWh/100 km · consumo medio real del coche (autonomía ganada)
-  const BONO = 0.5;           // descuento bono social sobre el kWh
+  const BONO_DTO = 0.425;     // bono social: 42,5 % de descuento sobre el kWh
+  const BONO = 1 - BONO_DTO;  // factor que se aplica al precio
   const FULL_MIN = Math.round(BATTERY / POWER * 60); // ≈ 22 h 44 min
 
   const $ = s => document.querySelector(s);
@@ -452,16 +453,82 @@
       if (!booting || !hero.classList.contains('boot')) return;
       requestAnimationFrame(() => {
         hero.classList.remove('boot');                     // aparece el coche
-        setTimeout(() => {
+        const blinkNow = () => {
           const lit = $('.bg-blink');
           lit.addEventListener('animationend', finishBoot, { once: true });
           hero.classList.add('blink');                     // parpadeo × 2
           setTimeout(finishBoot, 2200);                    // por seguridad
-        }, 700);
+        };
+        // si está abierto el aviso de precios, los intermitentes esperan a que se cierre
+        setTimeout(() => { if (welcomeOpen) pendingBlink = blinkNow; else blinkNow(); }, 700);
       });
     };
     Promise.race([ready, new Promise(r => setTimeout(r, 1500))]).then(start);
   }
+
+  // ---------- Aviso inicial: precios de hoy por horas ----------
+  let welcomeOpen = false, pendingBlink = null;
+  async function showWelcome() {
+    const w = $('#welcome'), ch = $('#wChart');
+    welcomeOpen = true; w.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => w.classList.add('show')));
+    const today = new Date();
+    $('#wDay').textContent = `Precio de la luz · hoy, ${dayLabel(ymd(today))}`;
+    ch.innerHTML = Array.from({ length: 24 }, (_, h) => `<div class="bar na"><i style="height:${18 + 10 * Math.sin(h / 3.5) ** 2}%"></i></div>`).join('');
+    let hours = null;
+    try { hours = await Promise.race([getPrices(ymd(today)), new Promise((_, r) => setTimeout(r, 6000))]); } catch {}
+    if (!welcomeOpen) return;
+    if (!hours || !hours.some(v => v != null)) {
+      $('#wSub').textContent = 'No se han podido cargar los precios de hoy. Revisa la conexión.';
+      return;
+    }
+    const k = bonoPref ? BONO : 1, hs = hours.map(p => p == null ? null : p * k);
+    const lv = levelsFor(hs), valid = hs.filter(v => v != null), max = Math.max(...valid), nowH = today.getHours();
+    ch.innerHTML = '';
+    const sel = h => {
+      const p = hs[h], l = lv(p);
+      [...ch.children].forEach((b, i) => b.classList.toggle('sel', i === h));
+      if (p == null) $('#wNow').textContent = '—'; else setNum($('#wNow'), p, f4);
+      const b = $('#wBadge'); b.className = `badge ${l}`; b.textContent = LV_TXT[l];
+      $('#wSub').textContent = `${h === nowH ? 'Ahora' : 'A las ' + pad(h) + ':00'} · ${pad(h)}:00 – ${pad((h + 1) % 24)}:00` +
+        (p == null ? '' : ` · ${f2.format(p * POWER)} € por hora de carga`);
+    };
+    hs.forEach((p, h) => {
+      const bar = document.createElement('div');
+      bar.className = `bar ${lv(p)}${h === nowH ? ' now' : ''}`;
+      bar.innerHTML = '<i style="height:0%"></i>';
+      bar.addEventListener('click', () => sel(h));
+      ch.appendChild(bar);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        bar.firstChild.style.transitionDelay = (120 + h * 18) + 'ms';
+        bar.firstChild.style.height = p == null ? '4%' : `${Math.max(6, p / max * 100)}%`;
+      }));
+    });
+    ch.classList.add('has-sel');
+    sel(nowH);
+    $('#wBono').hidden = !bonoPref;
+    // mejor ventana de 4 h desde ahora
+    let best = null;
+    for (let h = nowH; h + 4 <= 24; h++) {
+      const seg = hs.slice(h, h + 4); if (seg.some(v => v == null)) continue;
+      const m = seg.reduce((x, y) => x + y, 0) / 4; if (!best || m < best.m) best = { h, m };
+    }
+    const bb = $('#wBest');
+    if (best) { bb.hidden = false; bb.innerHTML = `<span>Mejor momento para cargar</span><b>${pad(best.h)}:00 – ${pad((best.h + 4) % 24)}:00</b><small>Media ${f4.format(best.m)} €/kWh · ${f2.format(best.m * POWER * 4)} € por 4 h</small>`; }
+    const mn = Math.min(...valid), avg = valid.reduce((x, y) => x + y, 0) / valid.length;
+    $('#wStats').innerHTML = `<div><small>Mínimo · ${pad(hs.indexOf(mn))}h</small><b>${f4.format(mn)}</b></div><div><small>Media</small><b>${f4.format(avg)}</b></div><div><small>Máximo · ${pad(hs.indexOf(max))}h</small><b>${f4.format(max)}</b></div>`;
+  }
+  function closeWelcome() {
+    const w = $('#welcome'); if (!welcomeOpen) return;
+    welcomeOpen = false;
+    w.classList.remove('show'); w.classList.add('hide');
+    setTimeout(() => { w.hidden = true; w.classList.remove('hide'); }, 420);
+    if (pendingBlink) { const f = pendingBlink; pendingBlink = null; setTimeout(f, 260); }
+  }
+  $('#wGo').addEventListener('click', closeWelcome);
+  $('#wClose').addEventListener('click', closeWelcome);
+  $('#welcome').addEventListener('click', e => { if (e.target.id === 'welcome') closeWelcome(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && welcomeOpen) closeWelcome(); });
 
   // ---------- Estado de carga (coche) ----------
   let live = store.get('ev3.live', null);
@@ -568,7 +635,9 @@
 
   // ---------- INICIO ----------
   let dayIdx = 0, selHour = null, lastDay = null, dayData = null;
-  let bonoPref = store.get('ev3.bono', false);
+  // Bono social activado por defecto (se fuerza una vez al pasar al 42,5 %)
+  if (!store.get('ev3.bono425', false)) { store.set('ev3.bono', true); store.set('ev3.bono425', true); }
+  let bonoPref = store.get('ev3.bono', true);
 
   async function renderInicio() {
     const today = new Date();
@@ -581,6 +650,7 @@
     if (ymd(addDays(new Date(), dayIdx)) !== date) return;
 
     const has = hours && hours.some(v => v != null);
+    if (has && bonoPref) hours = hours.map(p => p == null ? null : p * BONO);   // precios con bono social
     chart.innerHTML = '';
     chart.classList.remove('has-sel');
     $('#bestCard').hidden = true;
@@ -630,7 +700,8 @@
       $('#priceLabel').textContent = selHour === nowH ? 'Precio ahora' : `Precio a las ${pad(selHour)}:00${dayIdx ? ' · mañana' : ''}`;
       if (p == null) { $('#priceValue').textContent = '—'; $('#priceValue')._v = undefined; } else setNum($('#priceValue'), p, f4);
       const b = $('#priceBadge'); b.className = `badge ${l}`; b.textContent = LV_TXT[l];
-      $('#priceHour').textContent = `${pad(selHour)}:00 – ${pad((selHour + 1) % 24)}:00` + (p == null ? '' : ` · ${f2.format(p * POWER * (bonoPref ? BONO : 1))} € por hora de carga${bonoPref ? ' (bono social)' : ''}`);
+      $('#priceHour').textContent = `${pad(selHour)}:00 – ${pad((selHour + 1) % 24)}:00` + (p == null ? '' : ` · ${f2.format(p * POWER)} € por hora de carga`);
+      $('#priceBono').hidden = !bonoPref;
     }
     updateSel();
 
@@ -650,7 +721,7 @@
       if (!best || m < best.m) best = { h, m };
     }
     if (best) {
-      const kwh = POWER * W, k = bonoPref ? BONO : 1;
+      const kwh = POWER * W, k = 1;
       $('#bestText').textContent = `${pad(best.h)}:00 – ${pad((best.h + W) % 24)}:00`;
       $('#bestSub').textContent = `Media ${f4.format(best.m)} €/kWh · +${f0.format(kmOf(kwh))} km de autonomía por ${f2.format(kwh * best.m * k)} € · Toca para simular`;
       const card = $('#bestCard'); card.hidden = false;
@@ -663,12 +734,12 @@
     if (!dayData) return;
     const { date, hours } = dayData;
     const lv = levelsFor(hours);
-    const k = bonoPref ? BONO : 1;
+    const k = 1;   // los precios del día ya llevan el bono aplicado
     const nowH = date === ymd(new Date()) ? new Date().getHours() : null;
     const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
     $('#psTitle').textContent = `${dayIdx ? 'Mañana' : 'Hoy'} · ${dayLabel(date)}`;
-    $('#psSub').textContent = `PVPC con impuestos · coste de 1 h de carga a 3,7 kW${bonoPref ? ' con bono social (−50 %)' : ''}`;
-    $('#psCostHead').textContent = bonoPref ? '1 h (bono)' : '1 h carga';
+    $('#psSub').textContent = `PVPC con impuestos · coste de 1 h de carga a 3,7 kW${bonoPref ? ' · con bono social (−42,5 %)' : ''}`;
+    $('#psCostHead').textContent = '1 h carga';
     $('#psRows').innerHTML = hours.map((p, h) => {
       const l = lv(p);
       return `<div class="ptr ${h === focusH ? 'focus' : ''} ${h === nowH ? 'now' : ''}" data-h="${h}">
@@ -735,7 +806,7 @@
   }
 
   ['#simDate', '#simStart', '#simEnd'].forEach(s => $(s).addEventListener('input', runSim));
-  $('#simBono').addEventListener('change', e => { bonoPref = e.target.checked; store.set('ev3.bono', bonoPref); runSim(); });
+  $('#simBono').addEventListener('change', e => { bonoPref = e.target.checked; store.set('ev3.bono', bonoPref); runSim(); renderInicio(); });
   $('#simChips').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     const s = parseDT($('#simDate').value || ymd(new Date()), $('#simStart').value || '00:00');
@@ -1165,6 +1236,7 @@
   // ---------- Arranque ----------
   renderStatus();
   go('inicio');            // la app arranca siempre en Inicio
+  showWelcome();           // aviso inicial: precio de la luz por horas con el bono aplicado
   bootSequence();
   getPrices(ymd(addDays(new Date(), 1))).catch(() => {});
 

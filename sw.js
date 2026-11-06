@@ -1,4 +1,4 @@
-const VERSION = 'ev3-v11';
+const VERSION = 'ev3-v12';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/xlsx-lite.js', '/manifest.webmanifest',
   '/bg-normal.jpg', '/bg-carga.jpg', '/bg-intermitentes.jpg',
   '/icon-192.png', '/apple-touch-icon.png', '/favicon.png'];
